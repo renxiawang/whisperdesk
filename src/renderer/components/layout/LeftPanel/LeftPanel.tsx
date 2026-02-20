@@ -20,6 +20,7 @@ function LeftPanel(): React.JSX.Element {
     handleFilesSelect,
     removeFromQueue,
     clearCompletedFromQueue,
+    handleRetryFailed,
     selectQueueItem,
   } = useAppTranscription();
 
@@ -46,6 +47,7 @@ function LeftPanel(): React.JSX.Element {
           queue={queue}
           onRemove={removeFromQueue}
           onClearCompleted={clearCompletedFromQueue}
+          onRetryFailed={handleRetryFailed}
           onSelectItem={selectQueueItem}
           selectedItemId={selectedQueueItemId}
           disabled={isTranscribing}

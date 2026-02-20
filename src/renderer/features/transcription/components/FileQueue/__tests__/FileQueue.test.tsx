@@ -20,6 +20,7 @@ describe('FileQueue', () => {
     queue: [createMockQueueItem()],
     onRemove: vi.fn(),
     onClearCompleted: vi.fn(),
+    onRetryFailed: vi.fn(),
     onSelectItem: vi.fn(),
     selectedItemId: null,
     disabled: false,
@@ -168,6 +169,35 @@ describe('FileQueue', () => {
 
       fireEvent.click(screen.getByText(/Clear/));
       expect(onClearCompleted).toHaveBeenCalled();
+    });
+  });
+
+  describe('retry failed button', () => {
+    it('should show retry button when there are failed items', () => {
+      const queue = [createMockQueueItem({ status: 'error', error: 'Failed' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.getByText('Retry Failed')).toBeInTheDocument();
+    });
+
+    it('should show retry button when there are cancelled items', () => {
+      const queue = [createMockQueueItem({ status: 'cancelled' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.getByText('Retry Failed')).toBeInTheDocument();
+    });
+
+    it('should not show retry button when there are no failed or cancelled items', () => {
+      const queue = [createMockQueueItem({ status: 'pending' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.queryByText('Retry Failed')).not.toBeInTheDocument();
+    });
+
+    it('should call onRetryFailed when clicking retry button', () => {
+      const onRetryFailed = vi.fn();
+      const queue = [createMockQueueItem({ status: 'error', error: 'Failed' })];
+      render(<FileQueue {...defaultProps} queue={queue} onRetryFailed={onRetryFailed} />);
+
+      fireEvent.click(screen.getByText('Retry Failed'));
+      expect(onRetryFailed).toHaveBeenCalled();
     });
   });
 

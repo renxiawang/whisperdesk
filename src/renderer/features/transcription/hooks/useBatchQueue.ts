@@ -32,6 +32,7 @@ interface UseBatchQueueReturn {
   clearAll: () => void;
 
   startProcessing: () => Promise<void>;
+  retryFailed: () => Promise<void>;
   cancelProcessing: () => Promise<void>;
 
   getCompletedTranscription: (id: string) => string | undefined;
@@ -60,6 +61,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const hasCalledFirstCompleteRef = useRef(false);
   const progressUnsubscribeRef = useRef<(() => void) | null>(null);
   const queueRef = useRef<QueueItem[]>([]);
+  const activeRunItemIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     queueRef.current = queue;
@@ -259,51 +261,71 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     [settings, onHistoryAdd, onFirstComplete]
   );
 
-  const startProcessing = useCallback(async () => {
-    if (isProcessing) return;
+  const runProcessing = useCallback(
+    async (targetStatuses: QueueItemStatus[], noItemsLogMessage: string) => {
+      if (isProcessing) return;
 
-    const itemsToProcess = queue.filter(
-      (item) => item.status === 'pending' || item.status === 'cancelled' || item.status === 'error'
-    );
+      const itemsToProcess = queue.filter((item) => targetStatuses.includes(item.status));
 
-    if (itemsToProcess.length === 0) {
-      logger.warn('No items to process');
-      return;
-    }
-
-    setQueue((prev) =>
-      prev.map((item) =>
-        item.status === 'cancelled' || item.status === 'error'
-          ? { ...item, status: 'pending' as QueueItemStatus, error: undefined, endTime: undefined }
-          : item
-      )
-    );
-
-    setIsProcessing(true);
-    isCancelledRef.current = false;
-    hasCalledFirstCompleteRef.current = false;
-
-    logger.info('Starting batch processing', { count: itemsToProcess.length });
-
-    for (const item of itemsToProcess) {
-      if (isCancelledRef.current) {
-        setQueue((prev) =>
-          prev.map((q) =>
-            q.status === 'pending' ? { ...q, status: 'cancelled' as QueueItemStatus } : q
-          )
-        );
-        break;
+      if (itemsToProcess.length === 0) {
+        logger.warn(noItemsLogMessage);
+        return;
       }
 
-      const resetItem = { ...item, status: 'pending' as QueueItemStatus, error: undefined };
-      const processedItem = await processItem(resetItem);
-      setQueue((prev) => prev.map((q) => (q.id === processedItem.id ? processedItem : q)));
-    }
+      const activeIds = new Set(itemsToProcess.map((item) => item.id));
+      activeRunItemIdsRef.current = activeIds;
 
-    setIsProcessing(false);
-    setCurrentItemId(null);
-    logger.info('Batch processing complete');
-  }, [isProcessing, queue, processItem]);
+      setQueue((prev) =>
+        prev.map((item) =>
+          activeIds.has(item.id) && (item.status === 'cancelled' || item.status === 'error')
+            ? {
+                ...item,
+                status: 'pending' as QueueItemStatus,
+                error: undefined,
+                endTime: undefined,
+              }
+            : item
+        )
+      );
+
+      setIsProcessing(true);
+      isCancelledRef.current = false;
+      hasCalledFirstCompleteRef.current = false;
+
+      logger.info('Starting batch processing', { count: itemsToProcess.length });
+
+      for (const item of itemsToProcess) {
+        if (isCancelledRef.current) {
+          setQueue((prev) =>
+            prev.map((q) =>
+              q.status === 'pending' && activeIds.has(q.id)
+                ? { ...q, status: 'cancelled' as QueueItemStatus }
+                : q
+            )
+          );
+          break;
+        }
+
+        const resetItem = { ...item, status: 'pending' as QueueItemStatus, error: undefined };
+        const processedItem = await processItem(resetItem);
+        setQueue((prev) => prev.map((q) => (q.id === processedItem.id ? processedItem : q)));
+      }
+
+      setIsProcessing(false);
+      setCurrentItemId(null);
+      activeRunItemIdsRef.current = new Set();
+      logger.info('Batch processing complete');
+    },
+    [isProcessing, queue, processItem]
+  );
+
+  const startProcessing = useCallback(async () => {
+    await runProcessing(['pending', 'cancelled', 'error'], 'No items to process');
+  }, [runProcessing]);
+
+  const retryFailed = useCallback(async () => {
+    await runProcessing(['cancelled', 'error'], 'No failed items to retry');
+  }, [runProcessing]);
 
   const cancelProcessing = useCallback(async () => {
     if (!isProcessing) return;
@@ -316,7 +338,8 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
     setQueue((prev) =>
       prev.map((q) =>
-        q.status === 'processing' || q.status === 'pending'
+        q.status === 'processing' ||
+        (q.status === 'pending' && activeRunItemIdsRef.current.has(q.id))
           ? { ...q, status: 'cancelled' as QueueItemStatus, endTime: Date.now() }
           : q
       )
@@ -353,6 +376,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     clearAll,
 
     startProcessing,
+    retryFailed,
     cancelProcessing,
 
     getCompletedTranscription,

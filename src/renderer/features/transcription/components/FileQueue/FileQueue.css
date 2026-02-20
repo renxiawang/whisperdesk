@@ -26,6 +26,12 @@
   gap: 6px;
 }
 
+.file-queue-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .file-queue-list {
   min-height: 44px;
   max-height: 200px;

@@ -60,6 +60,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
     removeFile,
     clearCompleted,
     startProcessing,
+    retryFailed,
     cancelProcessing,
     getCompletedTranscription,
   } = useBatchQueue({
@@ -101,6 +102,10 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   const handleTranscribe = useCallback(async (): Promise<void> => {
     await startProcessing();
   }, [startProcessing]);
+
+  const handleRetryFailed = useCallback(async (): Promise<void> => {
+    await retryFailed();
+  }, [retryFailed]);
 
   const handleCancel = useCallback(async (): Promise<void> => {
     await cancelProcessing();
@@ -225,6 +230,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       setSettings,
       setModelDownloaded,
       handleTranscribe,
+      handleRetryFailed,
       handleCancel,
       handleSave,
       handleCopy: onCopy,
@@ -238,6 +244,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       setSettings,
       setModelDownloaded,
       handleTranscribe,
+      handleRetryFailed,
       handleCancel,
       handleSave,
       onCopy,

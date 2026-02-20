@@ -555,6 +555,76 @@ describe('useBatchQueue', () => {
 
       expect(result.current.queue[0]!.status).toBe('completed');
     });
+
+    it('should retry only failed and cancelled items', async () => {
+      const startTranscriptionMock = vi
+        .fn()
+        .mockResolvedValueOnce({ success: false, error: 'First failed' })
+        .mockResolvedValueOnce({ success: true, cancelled: true })
+        .mockResolvedValueOnce({ success: true, text: 'third-complete' })
+        .mockResolvedValueOnce({ success: true, text: 'retry-first' })
+        .mockResolvedValueOnce({ success: true, text: 'retry-second' });
+
+      overrideElectronAPI({
+        startTranscription: startTranscriptionMock,
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([
+          createMockSelectedFile('audio1.mp3'),
+          createMockSelectedFile('audio2.mp3'),
+          createMockSelectedFile('audio3.mp3'),
+        ]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(result.current.queue[0]!.status).toBe('error');
+      expect(result.current.queue[1]!.status).toBe('cancelled');
+      expect(result.current.queue[2]!.status).toBe('completed');
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio4.mp3')]);
+      });
+
+      expect(result.current.queue[3]!.status).toBe('pending');
+
+      await act(async () => {
+        await result.current.retryFailed();
+      });
+
+      expect(startTranscriptionMock).toHaveBeenCalledTimes(5);
+      expect(result.current.queue[0]!.status).toBe('completed');
+      expect(result.current.queue[1]!.status).toBe('completed');
+      expect(result.current.queue[2]!.status).toBe('completed');
+      expect(result.current.queue[3]!.status).toBe('pending');
+    });
+
+    it('should not retry pending items when using retryFailed', async () => {
+      const startTranscriptionMock = vi.fn().mockResolvedValue({ success: true, text: 'text' });
+      overrideElectronAPI({
+        startTranscription: startTranscriptionMock,
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      await act(async () => {
+        await result.current.retryFailed();
+      });
+
+      expect(startTranscriptionMock).not.toHaveBeenCalled();
+      expect(result.current.queue[0]!.status).toBe('pending');
+    });
   });
 
   describe('progress and cancellation flow', () => {

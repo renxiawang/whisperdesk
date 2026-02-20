@@ -41,6 +41,7 @@ export interface TranscriptionActionsContextValue {
   setSettings: (settings: TranscriptionSettings) => void;
   setModelDownloaded: (downloaded: boolean) => void;
   handleTranscribe: () => Promise<void>;
+  handleRetryFailed: () => Promise<void>;
   handleCancel: () => Promise<void>;
   handleSave: (format?: OutputFormat) => Promise<void>;
   handleCopy: () => Promise<void>;

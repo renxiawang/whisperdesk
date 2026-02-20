@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Loader, Clock, XCircle, Slash, X, Trash2 } from 'lucide-react';
+import { CheckCircle, Loader, Clock, XCircle, Slash, X, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '../../../../components/ui';
 import { formatFileSize } from '../../../../utils';
 import type { QueueItem, QueueItemStatus } from '../../../../types';
@@ -9,6 +9,7 @@ export interface FileQueueProps {
   queue: QueueItem[];
   onRemove: (id: string) => void;
   onClearCompleted: () => void;
+  onRetryFailed: () => void;
   onSelectItem?: (id: string) => void;
   selectedItemId?: string | null;
   disabled?: boolean;
@@ -35,6 +36,7 @@ function FileQueue({
   queue,
   onRemove,
   onClearCompleted,
+  onRetryFailed,
   onSelectItem,
   selectedItemId,
   disabled = false,
@@ -47,6 +49,9 @@ function FileQueue({
   const processingCount = queue.filter((item) => item.status === 'processing').length;
   const pendingCount = queue.filter((item) => item.status === 'pending').length;
   const errorCount = queue.filter((item) => item.status === 'error').length;
+  const cancelledCount = queue.filter((item) => item.status === 'cancelled').length;
+  const retryCount = errorCount + cancelledCount;
+  const hasRetryItems = retryCount > 0;
   const hasCompletedItems = completedCount > 0 || queue.some((item) => item.status === 'cancelled');
 
   const handleItemClick = (id: string): void => {
@@ -63,18 +68,32 @@ function FileQueue({
     <div className="file-queue">
       <div className="file-queue-header">
         <span className="file-queue-title">FILES ({queue.length})</span>
-        {hasCompletedItems && (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Trash2 size={14} />}
-            onClick={onClearCompleted}
-            disabled={disabled}
-            title="Clear completed"
-          >
-            Clear
-          </Button>
-        )}
+        <div className="file-queue-header-actions">
+          {hasRetryItems && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RotateCcw size={14} />}
+              onClick={onRetryFailed}
+              disabled={disabled}
+              title="Retry failed and cancelled items"
+            >
+              Retry Failed
+            </Button>
+          )}
+          {hasCompletedItems && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Trash2 size={14} />}
+              onClick={onClearCompleted}
+              disabled={disabled}
+              title="Clear completed"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="file-queue-list">
