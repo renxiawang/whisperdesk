@@ -1,3 +1,26 @@
+## [1.9.0](https://github.com/PVAS-Development/whisperdesk/compare/v1.8.0...v1.9.0) (2026-02-20)
+
+### ✨ Features
+
+- add estimated time remaining feature to file queue and batch processing ([51d51ad](https://github.com/PVAS-Development/whisperdesk/commit/51d51ad1252e516f52f734e900a57280f2b0ac0e))
+- add queue resume functionality with UI prompt and local storage handling ([e5df5ca](https://github.com/PVAS-Development/whisperdesk/commit/e5df5ca6c9ca61b58e83fe5e73bb2c206f7da31b))
+- add retry functionality for failed and cancelled transcription items ([5011ecc](https://github.com/PVAS-Development/whisperdesk/commit/5011ecc985cfc8988a51f6dabf1c80214e4e9376))
+- add search functionality to transcription history with filtering and clear option ([a3e6735](https://github.com/PVAS-Development/whisperdesk/commit/a3e67352c2befded0173adabec9473b765a3971a))
+- add support for additional audio formats (OPUS, OGA, AMR) and update related components ([f4b332c](https://github.com/PVAS-Development/whisperdesk/commit/f4b332cffc1d56ffe9ff3c2f7386e9748b0e309b))
+- enhance FileQueue with user-friendly error messages and toast notifications for failed items ([5143d07](https://github.com/PVAS-Development/whisperdesk/commit/5143d07b887475902a9cb092d6e0754e7c9ba070))
+- estimate remaining time during transcription processing ([854be2c](https://github.com/PVAS-Development/whisperdesk/commit/854be2c7f5b45ee7ad617a35dd6b9b42696fab10))
+- implement duplicate file handling in batch queue and UI updates ([f6746dd](https://github.com/PVAS-Development/whisperdesk/commit/f6746dda1be8e9302b13b36f97004439d60bcdcd))
+- implement safeSend utility for IPC communication and enhance error handling ([0466600](https://github.com/PVAS-Development/whisperdesk/commit/04666002369eb75ccaac060c30dcbd9acdbbfb41))
+- implement showItemInFolder functionality and related tests ([ca1973b](https://github.com/PVAS-Development/whisperdesk/commit/ca1973bbacf5f010066deaee7db62b7597ff8a3c))
+- update README and documentation to reflect new features ([f02eb73](https://github.com/PVAS-Development/whisperdesk/commit/f02eb738724d02b45cde37ebbee319a2183afb77))
+
+### 🐛 Bug Fixes
+
+- adjust margin-top in FileQueue CSS for better layout ([586b979](https://github.com/PVAS-Development/whisperdesk/commit/586b9794edacfecd9011d55225d8fa7d5110b344))
+- improve error handling and resource management in file fingerprint generation ([35c312c](https://github.com/PVAS-Development/whisperdesk/commit/35c312c04d42200d02a4a2ad62970af1173fea3b))
+- resolve file path validation logic and enhance language auto-detection comment ([afe0a64](https://github.com/PVAS-Development/whisperdesk/commit/afe0a64e1a3c7262d30e6abee4b327b7ba7bc414))
+- simplify language argument handling in transcribe function ([d6b7302](https://github.com/PVAS-Development/whisperdesk/commit/d6b73027e299c7ca105124a65153afe7b0742df1))
+
 ## [1.8.0](https://github.com/PVAS-Development/whisperdesk/compare/v1.7.1...v1.8.0) (2025-12-21)
 
 ### ✨ Features
