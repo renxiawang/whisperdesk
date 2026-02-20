@@ -422,6 +422,10 @@ describe('SettingsPanel', () => {
     });
 
     const modelSelect = screen.getByLabelText('Select Whisper model') as HTMLSelectElement;
+    await waitFor(() => {
+      expect(modelSelect).not.toBeDisabled();
+    });
+
     fireEvent.change(modelSelect, { target: { value: 'small' } });
 
     await waitFor(() => {
