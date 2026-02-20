@@ -4,36 +4,40 @@ import { sanitizePath } from '../../shared/utils';
 
 const CHUNK_SIZE = 128 * 1024; // 128 KB
 
-function readChunk(fd: number, position: number, length: number): Buffer {
+async function readChunk(
+  handle: fs.promises.FileHandle,
+  position: number,
+  length: number
+): Promise<Buffer> {
   const safeLength = Math.max(0, Math.min(length, CHUNK_SIZE));
   if (safeLength === 0) {
     return Buffer.alloc(0);
   }
 
   const buffer = Buffer.allocUnsafe(safeLength);
-  const bytesRead = fs.readSync(fd, buffer, 0, safeLength, position);
+  const { bytesRead } = await handle.read(buffer, 0, safeLength, position);
   return bytesRead === safeLength ? buffer : buffer.subarray(0, bytesRead);
 }
 
-export function generateFileFingerprint(filePath: string, fileSize: number): string {
+export async function generateFileFingerprint(filePath: string, fileSize: number): Promise<string> {
   const hash = crypto.createHash('sha256');
   hash.update(String(fileSize));
 
-  let fd: number | null = null;
+  let fileHandle: fs.promises.FileHandle | null = null;
   try {
-    fd = fs.openSync(filePath, 'r');
+    fileHandle = await fs.promises.open(filePath, 'r');
 
     const firstChunkSize = Math.min(fileSize, CHUNK_SIZE);
-    hash.update(readChunk(fd, 0, firstChunkSize));
+    hash.update(await readChunk(fileHandle, 0, firstChunkSize));
 
     if (fileSize > CHUNK_SIZE * 2) {
       const middleOffset = Math.max(0, Math.floor(fileSize / 2) - Math.floor(CHUNK_SIZE / 2));
-      hash.update(readChunk(fd, middleOffset, CHUNK_SIZE));
+      hash.update(await readChunk(fileHandle, middleOffset, CHUNK_SIZE));
     }
 
     if (fileSize > CHUNK_SIZE) {
       const lastOffset = Math.max(0, fileSize - CHUNK_SIZE);
-      hash.update(readChunk(fd, lastOffset, CHUNK_SIZE));
+      hash.update(await readChunk(fileHandle, lastOffset, CHUNK_SIZE));
     }
   } catch (error) {
     console.warn('Failed to generate file fingerprint', {
@@ -42,8 +46,8 @@ export function generateFileFingerprint(filePath: string, fileSize: number): str
     });
     throw error;
   } finally {
-    if (fd !== null) {
-      fs.closeSync(fd);
+    if (fileHandle !== null) {
+      await fileHandle.close();
     }
   }
 

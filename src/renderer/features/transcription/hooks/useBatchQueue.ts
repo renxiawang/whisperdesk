@@ -140,8 +140,8 @@ function loadPersistedQueue(): QueueItem[] {
   }
 }
 
-function persistQueue(queue: QueueItem[]): void {
-  const resumableItems: PersistedQueueItem[] = queue.reduce<PersistedQueueItem[]>((items, item) => {
+function getResumableQueueItems(queue: QueueItem[]): PersistedQueueItem[] {
+  return queue.reduce<PersistedQueueItem[]>((items, item) => {
     if (item.status === 'completed') {
       return items;
     }
@@ -160,7 +160,9 @@ function persistQueue(queue: QueueItem[]): void {
 
     return items;
   }, []);
+}
 
+function persistQueueSnapshot(resumableItems: PersistedQueueItem[]): void {
   try {
     if (resumableItems.length === 0) {
       localStorage.removeItem(QUEUE_STORAGE_KEY);
@@ -237,13 +239,15 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const isCancelledRef = useRef(false);
   const hasCalledFirstCompleteRef = useRef(false);
   const progressUnsubscribeRef = useRef<(() => void) | null>(null);
-  const queueRef = useRef<QueueItem[]>([]);
+  const queueRef = useRef<QueueItem[]>(queue);
+  const initialQueueLengthRef = useRef(queue.length);
+  const lastPersistedQueueSnapshotRef = useRef<string | null>(null);
   const activeRunItemIdsRef = useRef<Set<string>>(new Set());
   const currentItemStartTimeRef = useRef<number | null>(null);
   const remainingPendingCountRef = useRef(0);
 
   useEffect(() => {
-    const restoredCount = queue.length;
+    const restoredCount = initialQueueLengthRef.current;
     if (restoredCount > 0) {
       setShowQueueResumePrompt(true);
       setRestoredQueueItemsCount(restoredCount);
@@ -252,7 +256,16 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
   useEffect(() => {
     queueRef.current = queue;
-    persistQueue(queue);
+
+    const resumableItems = getResumableQueueItems(queue);
+
+    const currentSnapshot = JSON.stringify(resumableItems);
+    if (currentSnapshot === lastPersistedQueueSnapshotRef.current) {
+      return;
+    }
+
+    lastPersistedQueueSnapshotRef.current = currentSnapshot;
+    persistQueueSnapshot(resumableItems);
   }, [queue]);
 
   useEffect(() => {

@@ -456,6 +456,60 @@ describe('useBatchQueue', () => {
       expect(result.current.restoredQueueItemsCount).toBe(0);
       expect(result.current.queue[0]!.status).toBe('completed');
     });
+
+    it('should not persist queue again on progress-only updates', async () => {
+      let progressCallback: ((progress: TranscriptionProgress) => void) | undefined;
+      let resolveTranscription: ((value: TranscriptionResult) => void) | undefined;
+
+      overrideElectronAPI({
+        startTranscription: vi.fn().mockImplementation(
+          () =>
+            new Promise<TranscriptionResult>((resolve) => {
+              resolveTranscription = resolve;
+            })
+        ),
+        cancelTranscription: vi.fn().mockResolvedValue({ success: true }),
+        onTranscriptionProgress: vi.fn().mockImplementation((callback) => {
+          progressCallback = callback;
+          return () => {};
+        }),
+      });
+
+      const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      act(() => {
+        void result.current.startProcessing();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isProcessing).toBe(true);
+      });
+
+      const writesBeforeProgress = setItemSpy.mock.calls.length;
+
+      act(() => {
+        progressCallback?.({ percent: 15, status: 'Transcribing... 15%' });
+        progressCallback?.({ percent: 32, status: 'Transcribing... 32%' });
+        progressCallback?.({ percent: 58, status: 'Transcribing... 58%' });
+      });
+
+      await waitFor(() => {
+        expect(setItemSpy).toHaveBeenCalledTimes(writesBeforeProgress);
+      });
+
+      act(() => {
+        resolveTranscription?.({ success: true, text: 'Transcribed text' });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isProcessing).toBe(false);
+      });
+    });
   });
 
   describe('startProcessing', () => {

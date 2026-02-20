@@ -95,10 +95,10 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('file:getInfo', async (_event, filePath: string) => {
     try {
-      const stats = fs.statSync(filePath);
+      const stats = await fs.promises.stat(filePath);
       let fingerprint: string | undefined;
       try {
-        fingerprint = generateFileFingerprint(filePath, stats.size);
+        fingerprint = await generateFileFingerprint(filePath, stats.size);
       } catch {
         fingerprint = undefined;
       }
