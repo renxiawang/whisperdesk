@@ -18,15 +18,21 @@ A beautiful, native macOS desktop application for transcribing audio and video f
 
 - **Drag & Drop** - Drag single or multiple files to create a batch queue
 - **Batch Processing** - Process unlimited files sequentially with automatic queue management
+- **Queue Persistence + Resume** - Restore unfinished queue items after restarting the app
+- **Duplicate File Protection** - Automatically skips duplicates by file path/fingerprint in batch mode
+- **Retry Failed Items** - One-click retry for failed or cancelled queue items
+- **Live Batch ETA** - See estimated remaining time while batch processing is running
+- **Completion Notifications** - Native notification when a batch finishes
 - **Multiple Formats** - Supports MP3, WAV, M4A, FLAC, OGG, WMA, AAC, AIFF, MP4, MOV, AVI, MKV, WebM, WMV, FLV, M4V
 - **Multiple Models** - Choose from tiny, base, small, medium, large-v3, or large-v3-turbo Whisper models (including English-only variants)
 - **Output Formats** - Export as VTT subtitles, SRT subtitles, plain text, Word (`.docx`), PDF, or Markdown
+- **Finder Reveal After Save** - Prompt to reveal the saved transcript directly in Finder
 - **Language Support** - Auto-detect or select from 12+ languages
 - **Apple Silicon Optimized** - Native Metal GPU acceleration on M1/M2/M3/M4 Macs
 - **Dark Mode** - Beautiful dark theme that respects your system preference
 - **Auto Updates** - Automatic update notifications when new versions are available
 - **Keyboard Shortcuts** - Full keyboard navigation support
-- **Transcription History** - Keep track of your recent transcriptions
+- **Transcription History + Search** - Keep track of recent transcriptions and search by file name, content, model, or language
 - **Native Performance** - Uses whisper.cpp for fast, efficient transcription
 - **TypeScript** - Fully typed codebase for better maintainability
 - **Feature-Driven Architecture** - Modular codebase organized by feature domains

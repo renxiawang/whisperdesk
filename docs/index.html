@@ -8,7 +8,7 @@
     <meta name="title"
         content="WhisperDesk - Free Local AI Audio Transcription for macOS | Privacy-First Speech-to-Text">
     <meta name="description"
-        content="Free, open-source audio transcription app for macOS. Transcribe audio & video files privately using OpenAI's Whisper AI locally. No cloud uploads, no subscriptions. Supports Apple Silicon & Intel. Export to SRT, VTT, TXT.">
+        content="Free, open-source audio transcription app for macOS. Transcribe audio & video files privately using OpenAI's Whisper AI locally. No cloud uploads, no subscriptions. Supports Apple Silicon & Intel. Export to SRT, VTT, TXT, DOCX, PDF, and Markdown. Smart batch queue with resume, retry, live ETA, duplicate skipping, and searchable history">
     <meta name="keywords"
         content="whisper, transcription, audio transcription, video transcription, speech to text, voice to text, AI transcription, local transcription, offline transcription, macOS transcription app, free transcription software, open source transcription, whisper.cpp, OpenAI Whisper, Apple Silicon, M1, M2, M3, M4, subtitle generator, SRT generator, VTT generator, podcast transcription, meeting transcription, interview transcription, private transcription, secure transcription">
     <meta name="author" content="PVAS Development">
@@ -61,13 +61,16 @@
         },
         "license": "https://opensource.org/licenses/MIT",
         "screenshot": "https://whisperdesk.org/screenshot.png",
-        "softwareVersion": "1.1.6",
+        "softwareVersion": "1.9.0",
         "downloadUrl": "https://github.com/PVAS-Development/whisperdesk/releases/latest",
         "featureList": [
             "100% Local Processing",
             "GPU Accelerated (Apple Silicon Metal)",
-            "Multi-format Export (SRT, VTT, JSON, TXT)",
-            "Batch Processing Queue",
+            "Batch Queue with ETA, Retry, and Duplicate Protection",
+            "Queue Persistence and Resume After Restart",
+            "Transcription History Search",
+            "Multi-format Export (VTT, SRT, TXT, DOCX, PDF, Markdown)",
+            "Finder Reveal After Save",
             "No Internet Required",
             "No Subscription Fees",
             "Open Source (MIT License)"
@@ -134,7 +137,7 @@
                 "name": "What formats can WhisperDesk export?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "WhisperDesk supports exporting transcriptions to SRT (subtitles), VTT (web subtitles), JSON, and plain text formats."
+                    "text": "WhisperDesk can export transcripts as VTT, SRT, TXT, Markdown, DOCX, and PDF."
                 }
             },
             {
@@ -143,6 +146,14 @@
                 "acceptedAnswer": {
                     "@type": "Answer",
                     "text": "Yes, WhisperDesk is optimized for Apple Silicon (M1, M2, M3, M4) Macs with Metal GPU acceleration for blazing fast transcription speeds up to 100x real-time."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Can I resume my transcription queue after restarting the app?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. WhisperDesk restores unfinished queue items after restart and lets you resume processing with one click."
                 }
             }
         ]
@@ -175,8 +186,8 @@
                 <div class="nav-links">
                     <a href="#features" class="nav-link">Features</a>
                     <a href="#how-it-works" class="nav-link">How it Works</a>
-                    <a href="https://www.paypal.com/donate/?hosted_button_id=HTJXGMEGMWWD6" class="nav-link-icon" target="_blank"
-                        rel="noopener noreferrer" aria-label="Donate to WhisperDesk">
+                    <a href="https://www.paypal.com/donate/?hosted_button_id=HTJXGMEGMWWD6" class="nav-link-icon"
+                        target="_blank" rel="noopener noreferrer" aria-label="Donate to WhisperDesk">
                         <i data-lucide="heart" class="heart-icon"></i>
                     </a>
                     <a href="https://github.com/PVAS-Development/whisperdesk" class="nav-link-icon" target="_blank"
@@ -286,7 +297,8 @@
                         </div>
                         <h3 class="feature-title">Batch Processing</h3>
                         <p class="feature-description">
-                            Drag and drop multiple files or folders. Process unlimited audio files sequentially with automatic queue management.
+                            Drag and drop multiple files or folders. Process unlimited audio files sequentially with
+                            automatic queue management.
                         </p>
                     </article>
                 </div>
@@ -343,8 +355,8 @@
             <nav class="footer-links" aria-label="Footer navigation">
                 <a href="https://www.paypal.com/donate/?hosted_button_id=HTJXGMEGMWWD6" target="_blank"
                     rel="noopener noreferrer" class="footer-link">Donate</a>
-                <a href="https://www.buymeacoffee.com/pedrovsiqueira" target="_blank"
-                    rel="noopener noreferrer" class="footer-link">Buy me a coffee</a>
+                <a href="https://www.buymeacoffee.com/pedrovsiqueira" target="_blank" rel="noopener noreferrer"
+                    class="footer-link">Buy me a coffee</a>
                 <a href="https://github.com/PVAS-Development/whisperdesk/blob/main/LICENSE" target="_blank"
                     rel="noopener noreferrer" class="footer-link">License</a>
                 <a href="https://github.com/PVAS-Development/whisperdesk/blob/main/CONTRIBUTING.md" target="_blank"
