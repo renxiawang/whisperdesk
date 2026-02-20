@@ -1,5 +1,6 @@
 import fs from 'fs';
 import crypto from 'crypto';
+import { sanitizePath } from '../../shared/utils';
 
 const CHUNK_SIZE = 128 * 1024; // 128 KB
 
@@ -18,8 +19,10 @@ export function generateFileFingerprint(filePath: string, fileSize: number): str
   const hash = crypto.createHash('sha256');
   hash.update(String(fileSize));
 
-  const fd = fs.openSync(filePath, 'r');
+  let fd: number | null = null;
   try {
+    fd = fs.openSync(filePath, 'r');
+
     const firstChunkSize = Math.min(fileSize, CHUNK_SIZE);
     hash.update(readChunk(fd, 0, firstChunkSize));
 
@@ -32,8 +35,16 @@ export function generateFileFingerprint(filePath: string, fileSize: number): str
       const lastOffset = Math.max(0, fileSize - CHUNK_SIZE);
       hash.update(readChunk(fd, lastOffset, CHUNK_SIZE));
     }
+  } catch (error) {
+    console.warn('Failed to generate file fingerprint', {
+      file: sanitizePath(filePath),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   } finally {
-    fs.closeSync(fd);
+    if (fd !== null) {
+      fs.closeSync(fd);
+    }
   }
 
   return hash.digest('hex');
