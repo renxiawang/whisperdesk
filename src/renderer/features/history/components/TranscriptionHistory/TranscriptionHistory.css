@@ -61,6 +61,43 @@
   gap: 8px;
 }
 
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.history-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.history-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.history-search-summary {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.history-empty-search {
+  height: auto;
+  min-height: 160px;
+}
+
 .history-item {
   padding: 12px;
   background: var(--surface);

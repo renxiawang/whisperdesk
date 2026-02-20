@@ -1,5 +1,12 @@
-import React, { type KeyboardEvent } from 'react';
-import { History, Trash2, X, Inbox, Clock } from 'lucide-react';
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type ChangeEvent,
+} from 'react';
+import { History, Trash2, X, Inbox, Clock, Search } from 'lucide-react';
 import { Button } from '../../../../components/ui';
 import { formatDate, formatDuration } from '../../../../utils';
 import { getLanguageLabel } from '../../../../config';
@@ -22,10 +29,56 @@ function TranscriptionHistory({
   onSelect,
   onDelete,
 }: TranscriptionHistoryProps): React.JSX.Element {
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const filteredHistory = useMemo(() => {
+    if (!trimmedQuery) {
+      return history;
+    }
+
+    return history.filter((item) => {
+      const searchable = [
+        item.fileName,
+        item.preview,
+        item.fullText,
+        item.model,
+        getLanguageLabel(item.language),
+        item.format ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(trimmedQuery);
+    });
+  }, [history, trimmedQuery]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleItemKeyDown = (e: KeyboardEvent<HTMLDivElement>, item: HistoryItem): void => {
     if (e.key === 'Enter') {
       onSelect(item);
     }
+  };
+
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setSearchQuery(event.target.value);
+  };
+
+  const handleSearchClear = (): void => {
+    setSearchQuery('');
+    searchInputRef.current?.focus();
   };
 
   const handleDelete = (event: React.MouseEvent, itemId: string, fileName: string): void => {
@@ -74,44 +127,83 @@ function TranscriptionHistory({
             <span className="empty-hint">Your transcription history will appear here</span>
           </div>
         ) : (
-          <div className="history-list">
-            {history.map((item) => (
-              <div
-                key={item.id}
-                className="history-item"
-                onClick={() => onSelect(item)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => handleItemKeyDown(e, item)}
-              >
-                <div className="history-item-header">
-                  <span className="history-filename">{item.fileName}</span>
-                  <div className="history-item-header-actions">
-                    <span className="history-date">{formatDate(item.date)}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Trash2 size={14} />}
-                      iconOnly
-                      onClick={(event) => handleDelete(event, item.id, item.fileName)}
-                      title="Delete transcription"
-                      aria-label={`Delete ${item.fileName}`}
-                      className="history-item-delete"
-                    />
-                  </div>
-                </div>
-                <div className="history-item-meta">
-                  <span className="history-tag">{item.model}</span>
-                  <span className="history-tag">{getLanguageLabel(item.language)}</span>
-                  {item.format && <span className="history-tag">.{item.format}</span>}
-                  <span className="history-duration">
-                    <Clock size={12} aria-hidden="true" /> {formatDuration(item.duration)}
-                  </span>
-                </div>
-                <p className="history-preview">{item.preview}</p>
+          <>
+            <div className="history-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="history-search-input"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search history (file name, transcript, model, language)"
+                aria-label="Search history"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<X size={14} />}
+                  iconOnly
+                  onClick={handleSearchClear}
+                  title="Clear history search"
+                  aria-label="Clear history search"
+                />
+              )}
+            </div>
+
+            {trimmedQuery && (
+              <div className="history-search-summary">
+                {filteredHistory.length} result{filteredHistory.length === 1 ? '' : 's'}
               </div>
-            ))}
-          </div>
+            )}
+
+            {filteredHistory.length === 0 ? (
+              <div className="history-empty history-empty-search">
+                <span>No matches found</span>
+                <span className="empty-hint">Try different keywords</span>
+              </div>
+            ) : (
+              <div className="history-list">
+                {filteredHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className="history-item"
+                    onClick={() => onSelect(item)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => handleItemKeyDown(e, item)}
+                  >
+                    <div className="history-item-header">
+                      <span className="history-filename">{item.fileName}</span>
+                      <div className="history-item-header-actions">
+                        <span className="history-date">{formatDate(item.date)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<Trash2 size={14} />}
+                          iconOnly
+                          onClick={(event) => handleDelete(event, item.id, item.fileName)}
+                          title="Delete transcription"
+                          aria-label={`Delete ${item.fileName}`}
+                          className="history-item-delete"
+                        />
+                      </div>
+                    </div>
+                    <div className="history-item-meta">
+                      <span className="history-tag">{item.model}</span>
+                      <span className="history-tag">{getLanguageLabel(item.language)}</span>
+                      {item.format && <span className="history-tag">.{item.format}</span>}
+                      <span className="history-duration">
+                        <Clock size={12} aria-hidden="true" /> {formatDuration(item.duration)}
+                      </span>
+                    </div>
+                    <p className="history-preview">{item.preview}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
