@@ -22,6 +22,7 @@ import {
   installUpdate,
   onUpdateStatus,
   openExternal,
+  showItemInFolder,
   onMenuOpenFile,
   onMenuSaveFile,
   onMenuCopyTranscription,
@@ -112,6 +113,8 @@ describe('electronAPI wrapper', () => {
     unsubscribeUpdate();
 
     await expect(openExternal('https://example.com')).resolves.toBeUndefined();
+    const reveal = await showItemInFolder('/tmp/test.txt');
+    expect(reveal.success).toBe(false);
 
     const unsubscribeMenuOpen = onMenuOpenFile(() => {});
     expect(typeof unsubscribeMenuOpen).toBe('function');
@@ -211,6 +214,9 @@ describe('electronAPI wrapper', () => {
     await openExternal('https://example.com');
     expect(api.openExternal).toHaveBeenCalledWith('https://example.com');
 
+    await showItemInFolder('/tmp/test.txt');
+    expect(api.showItemInFolder).toHaveBeenCalledWith('/tmp/test.txt');
+
     onMenuOpenFile(() => {});
     expect(api.onMenuOpenFile).toHaveBeenCalled();
 
@@ -228,5 +234,16 @@ describe('electronAPI wrapper', () => {
 
     onMenuToggleHistory(() => {});
     expect(api.onMenuToggleHistory).toHaveBeenCalled();
+  });
+
+  it('showItemInFolder returns failure when underlying API throws', async () => {
+    const api = createFullElectronAPIMock();
+    api.showItemInFolder = vi.fn().mockRejectedValue(new Error('No handler registered'));
+    window.electronAPI = api;
+
+    const result = await showItemInFolder('/tmp/test.txt');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('No handler registered');
   });
 });

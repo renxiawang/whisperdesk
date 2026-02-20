@@ -104,6 +104,20 @@ describe('fileProcessing', () => {
       expect(result).toEqual([fileInfo]);
     });
 
+    it('processes .opus files as valid media', async () => {
+      const filePaths = ['/path/to/voice-note.opus'];
+      const fileInfo = { name: 'voice-note.opus', path: '/path/to/voice-note.opus', size: 2048 };
+
+      (electronAPI.openMultipleFilesDialog as Mock).mockResolvedValue(filePaths);
+      (electronAPI.getFileInfo as Mock).mockResolvedValue(fileInfo);
+      (validators.isValidMediaFile as Mock).mockReturnValue(true);
+
+      const result = await selectAndProcessFiles();
+
+      expect(result).toEqual([fileInfo]);
+      expect(validators.isValidMediaFile).toHaveBeenCalledWith('voice-note.opus');
+    });
+
     it('returns empty array when all files are invalid', async () => {
       const filePaths = ['/path/to/doc.pdf', '/path/to/text.txt'];
       const fileInfo1 = { name: 'doc.pdf', path: '/path/to/doc.pdf', size: 500 };

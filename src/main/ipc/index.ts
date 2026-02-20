@@ -16,8 +16,13 @@ import {
   generatePdfDocument,
   generateMarkdownDocument,
 } from '../utils/export-helper';
+import { generateFileFingerprint } from '../utils/media-info';
+import { safeSend } from '../utils/safe-send';
 import { trackEvent, AnalyticsEvents } from '../services/analytics';
+import { SUPPORTED_EXTENSIONS } from '../../shared/types';
 import type { TranscriptionOptions, SaveFileOptions } from '../../shared/types';
+
+const OPEN_DIALOG_MEDIA_EXTENSIONS = [...SUPPORTED_EXTENSIONS];
 
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('dialog:openFile', async () => {
@@ -29,7 +34,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       filters: [
         {
           name: 'Audio/Video',
-          extensions: ['mp3', 'wav', 'm4a', 'mp4', 'mov', 'mkv', 'flac', 'ogg', 'webm'],
+          extensions: OPEN_DIALOG_MEDIA_EXTENSIONS,
         },
       ],
     });
@@ -48,7 +53,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       filters: [
         {
           name: 'Audio/Video',
-          extensions: ['mp3', 'wav', 'm4a', 'mp4', 'mov', 'mkv', 'flac', 'ogg', 'webm'],
+          extensions: OPEN_DIALOG_MEDIA_EXTENSIONS,
         },
       ],
     });
@@ -91,11 +96,19 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('file:getInfo', async (_event, filePath: string) => {
     try {
-      const stats = fs.statSync(filePath);
+      const stats = await fs.promises.stat(filePath);
+      let fingerprint: string | undefined;
+      try {
+        fingerprint = await generateFileFingerprint(filePath, stats.size);
+      } catch {
+        fingerprint = undefined;
+      }
+
       return {
         name: path.basename(filePath),
         path: filePath,
         size: stats.size,
+        fingerprint,
       };
     } catch {
       return null;
@@ -114,7 +127,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('models:download', async (_event, modelName: string) => {
     try {
       const result = await downloadModel(modelName, (progress) => {
-        getMainWindow()?.webContents.send('models:downloadProgress', progress);
+        safeSend(getMainWindow(), 'models:downloadProgress', progress);
       });
       if (result.success) {
         trackEvent(AnalyticsEvents.MODEL_DOWNLOADED, { model: modelName });
@@ -138,7 +151,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('transcribe:start', async (_event, options: TranscriptionOptions) => {
     try {
       const promise = transcribe(options, (progress) => {
-        getMainWindow()?.webContents.send('transcribe:progress', progress);
+        safeSend(getMainWindow(), 'transcribe:progress', progress);
       });
 
       currentTranscription = promise;
@@ -226,5 +239,30 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       throw new Error('Invalid URL protocol. Only HTTPS is allowed.');
     }
     await shell.openExternal(url);
+  });
+
+  ipcMain.handle('shell:showItemInFolder', async (_event, filePath: string) => {
+    try {
+      if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+        return { success: false, error: 'Invalid file path' };
+      }
+
+      if (!path.isAbsolute(filePath)) {
+        return { success: false, error: 'Invalid file path' };
+      }
+
+      const resolvedPath = path.resolve(filePath);
+
+      try {
+        await fs.promises.access(resolvedPath, fs.constants.F_OK);
+      } catch {
+        return { success: false, error: 'File not found' };
+      }
+
+      shell.showItemInFolder(resolvedPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 }

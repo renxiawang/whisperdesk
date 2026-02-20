@@ -36,6 +36,7 @@ const mockElectronAPI: ElectronAPI = {
   }),
   trackEvent: vi.fn().mockResolvedValue(undefined),
   openExternal: vi.fn().mockResolvedValue(undefined),
+  showItemInFolder: vi.fn().mockResolvedValue({ success: true }),
   onMenuOpenFile: vi.fn().mockReturnValue(() => {}),
   onMenuSaveFile: vi.fn().mockReturnValue(() => {}),
   onMenuCopyTranscription: vi.fn().mockReturnValue(() => {}),

@@ -2,6 +2,7 @@ export interface SelectedFile {
   name: string;
   path: string;
   size?: number;
+  fingerprint?: string;
 }
 
 export type WhisperModelName =
@@ -178,6 +179,9 @@ export const SUPPORTED_EXTENSIONS = [
   'm4a',
   'flac',
   'ogg',
+  'opus',
+  'oga',
+  'amr',
   'wma',
   'aac',
   'aiff',

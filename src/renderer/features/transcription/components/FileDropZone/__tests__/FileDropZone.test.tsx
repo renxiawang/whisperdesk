@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, createEvent } from '@testing-library/react';
 import { FileDropZone } from '@/features/transcription';
 import { overrideElectronAPI } from '@/test/utils';
 import { createMockFile } from '@/test/fixtures';
@@ -16,6 +16,7 @@ describe('FileDropZone', () => {
 
     expect(screen.getByText(/Drop audio\/video files here/i)).toBeInTheDocument();
     expect(screen.getByText(/multiple files/i)).toBeInTheDocument();
+    expect(screen.getByText(/OPUS/i)).toBeInTheDocument();
   });
 
   it('should be clickable and open multiple files dialog', async () => {
@@ -75,6 +76,37 @@ describe('FileDropZone', () => {
     });
   });
 
+  it('should accept .opus files on drop', async () => {
+    overrideElectronAPI({
+      getPathForFile: vi.fn().mockReturnValue('/path/to/voice-note.opus'),
+      getFileInfo: vi.fn().mockResolvedValue({
+        name: 'voice-note.opus',
+        path: '/path/to/voice-note.opus',
+        size: 1024,
+      }),
+    });
+
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+
+    const dropzone = screen.getByRole('button');
+    const file = createMockFile({ name: 'voice-note.opus' });
+
+    fireEvent.drop(dropzone, {
+      dataTransfer: {
+        files: [file],
+      },
+    });
+
+    await waitFor(() => {
+      expect(onFilesSelect).toHaveBeenCalledWith([
+        expect.objectContaining({
+          name: 'voice-note.opus',
+          path: '/path/to/voice-note.opus',
+        }),
+      ]);
+    });
+  });
+
   it('should filter out invalid files', async () => {
     overrideElectronAPI({
       openMultipleFiles: vi.fn().mockResolvedValue(['/path/to/test.txt']),
@@ -102,10 +134,59 @@ describe('FileDropZone', () => {
     expect(window.electronAPI?.openMultipleFiles).not.toHaveBeenCalled();
   });
 
+  it('should prevent default on drag over', () => {
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+
+    const dropzone = screen.getByRole('button');
+    const event = createEvent.dragOver(dropzone);
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+    fireEvent(dropzone, event);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+
+  it('should open file dialog on Enter key', async () => {
+    overrideElectronAPI({
+      openMultipleFiles: vi.fn().mockResolvedValue(['/path/to/test1.mp3']),
+      getFileInfo: vi.fn().mockResolvedValue({
+        name: 'test1.mp3',
+        path: '/path/to/test1.mp3',
+        size: 1024,
+      }),
+    });
+
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+    const dropzone = screen.getByRole('button');
+
+    fireEvent.keyDown(dropzone, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(window.electronAPI?.openMultipleFiles).toHaveBeenCalled();
+      expect(onFilesSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('should ignore non-activation keys', () => {
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+    const dropzone = screen.getByRole('button');
+
+    fireEvent.keyDown(dropzone, { key: 'ArrowDown' });
+
+    expect(window.electronAPI?.openMultipleFiles).not.toHaveBeenCalled();
+  });
+
   it('should show queue count badge', () => {
     render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} queueCount={3} />);
 
     expect(screen.getByText('3 files in queue')).toBeInTheDocument();
+  });
+
+  it('should show duplicate files skipped badge', () => {
+    render(
+      <FileDropZone onFilesSelect={onFilesSelect} disabled={false} duplicateFilesSkipped={2} />
+    );
+
+    expect(screen.getByText('Skipped 2 duplicate files')).toBeInTheDocument();
   });
 
   it('should handle multiple files drop', async () => {

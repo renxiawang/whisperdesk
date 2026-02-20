@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import { FileQueue } from '../FileQueue';
 import type { QueueItem } from '@/types';
 
@@ -20,6 +21,7 @@ describe('FileQueue', () => {
     queue: [createMockQueueItem()],
     onRemove: vi.fn(),
     onClearCompleted: vi.fn(),
+    onRetryFailed: vi.fn(),
     onSelectItem: vi.fn(),
     selectedItemId: null,
     disabled: false,
@@ -113,6 +115,39 @@ describe('FileQueue', () => {
       render(<FileQueue {...defaultProps} queue={queue} />);
       expect(screen.getByText('Transcription failed')).toBeInTheDocument();
     });
+
+    it('should display a friendly message for FFmpeg files without audio tracks', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(
+        screen.getByText(
+          'No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('should expose full error text on hover tooltip', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+
+      const error = screen.getByText(
+        'No audio track found in this file. Please choose a file that contains audio.'
+      );
+      expect(error).toHaveAttribute(
+        'title',
+        'No audio track found in this file. Please choose a file that contains audio.'
+      );
+    });
   });
 
   describe('interactions', () => {
@@ -131,6 +166,62 @@ describe('FileQueue', () => {
       const removeButton = screen.getByLabelText('Remove audio.mp3 from queue');
       fireEvent.click(removeButton);
       expect(onRemove).toHaveBeenCalledWith('item-1');
+    });
+
+    it('should show a toast with friendly error when removing a failed item', () => {
+      const onRemove = vi.fn();
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} onRemove={onRemove} />);
+
+      const removeButton = screen.getByLabelText('Remove audio.mp3 from queue');
+      fireEvent.click(removeButton);
+
+      expect(onRemove).toHaveBeenCalledWith('item-1');
+      expect(
+        screen.getByText(
+          'Removed failed item: No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('should keep toast visible when removing the only failed item', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+
+      const Wrapper = () => {
+        const [items, setItems] = useState(queue);
+
+        return (
+          <FileQueue
+            queue={items}
+            onRemove={(id) => setItems((prev) => prev.filter((item) => item.id !== id))}
+            onClearCompleted={vi.fn()}
+            onRetryFailed={vi.fn()}
+            onSelectItem={vi.fn()}
+            selectedItemId={null}
+          />
+        );
+      };
+
+      render(<Wrapper />);
+
+      fireEvent.click(screen.getByLabelText('Remove audio.mp3 from queue'));
+
+      expect(
+        screen.getByText(
+          'Removed failed item: No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('FILES (1)')).not.toBeInTheDocument();
     });
 
     it('should not call onRemove when disabled', () => {
@@ -171,6 +262,35 @@ describe('FileQueue', () => {
     });
   });
 
+  describe('retry failed button', () => {
+    it('should show retry button when there are failed items', () => {
+      const queue = [createMockQueueItem({ status: 'error', error: 'Failed' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.getByText('Retry Failed')).toBeInTheDocument();
+    });
+
+    it('should show retry button when there are cancelled items', () => {
+      const queue = [createMockQueueItem({ status: 'cancelled' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.getByText('Retry Failed')).toBeInTheDocument();
+    });
+
+    it('should not show retry button when there are no failed or cancelled items', () => {
+      const queue = [createMockQueueItem({ status: 'pending' })];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(screen.queryByText('Retry Failed')).not.toBeInTheDocument();
+    });
+
+    it('should call onRetryFailed when clicking retry button', () => {
+      const onRetryFailed = vi.fn();
+      const queue = [createMockQueueItem({ status: 'error', error: 'Failed' })];
+      render(<FileQueue {...defaultProps} queue={queue} onRetryFailed={onRetryFailed} />);
+
+      fireEvent.click(screen.getByText('Retry Failed'));
+      expect(onRetryFailed).toHaveBeenCalled();
+    });
+  });
+
   describe('summary', () => {
     it('should show completed count', () => {
       const queue = [
@@ -195,6 +315,48 @@ describe('FileQueue', () => {
       const queue = [createMockQueueItem({ status: 'processing' })];
       render(<FileQueue {...defaultProps} queue={queue} />);
       expect(screen.getByText('1 processing')).toBeInTheDocument();
+    });
+
+    it('should show eta in seconds for short remaining time', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={45} />);
+      expect(screen.getByText('ETA 45s')).toBeInTheDocument();
+    });
+
+    it('should show eta in minutes and seconds', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={90} />);
+      expect(screen.getByText('ETA 1m 30s')).toBeInTheDocument();
+    });
+
+    it('should show eta in whole minutes when no remaining seconds', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={120} />);
+      expect(screen.getByText('ETA 2m')).toBeInTheDocument();
+    });
+
+    it('should show eta in hours when needed', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={7200} />);
+      expect(screen.getByText('ETA 2h')).toBeInTheDocument();
+    });
+
+    it('should show eta in hours and minutes when needed', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={7260} />);
+      expect(screen.getByText('ETA 2h 1m')).toBeInTheDocument();
+    });
+
+    it('should show eta as calculating while processing if estimate is not ready', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={null} />);
+      expect(screen.getByText('ETA calculating...')).toBeInTheDocument();
+    });
+
+    it('should not show eta when no items are processing', () => {
+      const queue = [createMockQueueItem({ status: 'pending' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={45} />);
+      expect(screen.queryByText(/ETA/)).not.toBeInTheDocument();
     });
 
     it('should show failed count', () => {

@@ -50,6 +50,123 @@ describe('TranscriptionHistory component', () => {
     expect(onSelect).toHaveBeenCalledWith(mockHistoryItem);
   });
 
+  it('filters history items by transcript content and file name', () => {
+    const onClear = vi.fn();
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const firstItem = createMockHistoryItem({
+      id: 'history-1',
+      fileName: 'finance-report.mp3',
+      fullText: 'Quarterly earnings increased by twelve percent',
+      preview: 'Quarterly earnings increased...',
+    });
+    const secondItem = createMockHistoryItem({
+      id: 'history-2',
+      fileName: 'meeting-notes.mp3',
+      fullText: 'Team retrospective and sprint planning notes',
+      preview: 'Team retrospective...',
+    });
+
+    render(
+      <TranscriptionHistory
+        history={[firstItem, secondItem]}
+        onClear={onClear}
+        onClose={onClose}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />
+    );
+
+    const searchInput = screen.getByLabelText('Search history');
+    fireEvent.change(searchInput, { target: { value: 'earnings' } });
+
+    expect(screen.getByText('finance-report.mp3')).toBeInTheDocument();
+    expect(screen.queryByText('meeting-notes.mp3')).not.toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: 'meeting-notes' } });
+
+    expect(screen.getByText('meeting-notes.mp3')).toBeInTheDocument();
+    expect(screen.queryByText('finance-report.mp3')).not.toBeInTheDocument();
+  });
+
+  it('shows empty search state when there are no matching history items', () => {
+    const onClear = vi.fn();
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const historyItem = createMockHistoryItem({
+      id: 'history-1',
+      fullText: 'The quick brown fox',
+      preview: 'The quick brown fox...',
+    });
+
+    render(
+      <TranscriptionHistory
+        history={[historyItem]}
+        onClear={onClear}
+        onClose={onClose}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Search history'), { target: { value: 'not found' } });
+
+    expect(screen.getByText('No matches found')).toBeInTheDocument();
+    expect(screen.getByText('0 results')).toBeInTheDocument();
+  });
+
+  it('clears the search query when clear search button is clicked', () => {
+    const onClear = vi.fn();
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const historyItem = createMockHistoryItem({
+      id: 'history-1',
+      fullText: 'alpha beta gamma',
+      preview: 'alpha beta gamma',
+    });
+
+    render(
+      <TranscriptionHistory
+        history={[historyItem]}
+        onClear={onClear}
+        onClose={onClose}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />
+    );
+
+    const searchInput = screen.getByLabelText('Search history') as HTMLInputElement;
+    fireEvent.change(searchInput, { target: { value: 'alpha' } });
+    expect(searchInput.value).toBe('alpha');
+
+    fireEvent.click(screen.getByLabelText('Clear history search'));
+    expect(searchInput.value).toBe('');
+  });
+
+  it('focuses search input with keyboard shortcut', () => {
+    const onClear = vi.fn();
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const historyItem = createMockHistoryItem();
+
+    render(
+      <TranscriptionHistory
+        history={[historyItem]}
+        onClear={onClear}
+        onClose={onClose}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />
+    );
+
+    fireEvent.keyDown(document, { key: 'f', ctrlKey: true });
+    expect(screen.getByLabelText('Search history')).toHaveFocus();
+  });
+
   it('calls onSelect on Enter key press', () => {
     const mockHistoryItem = createMockHistoryItem();
     const onClear = vi.fn();

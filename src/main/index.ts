@@ -4,9 +4,13 @@ import path from 'path';
 import { registerIpcHandlers } from './ipc';
 import { initAnalytics, trackEvent, AnalyticsEvents } from './services/analytics';
 import { initAutoUpdater, checkForUpdates } from './services/auto-updater';
+import { safeSend } from './utils/safe-send';
 import packageJson from '../../package.json';
 
 initAnalytics();
+
+const APP_DISPLAY_NAME = 'WhisperDesk';
+const APP_USER_MODEL_ID = 'com.whisperdesk.app';
 
 let mainWindow: BrowserWindow | null = null;
 let ipcHandlersRegistered = false;
@@ -15,6 +19,19 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const appVersion = packageJson.version;
 
 const UPDATE_CHECK_DELAY_MS = 3000;
+
+app.setName(APP_DISPLAY_NAME);
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+
+if (process.platform === 'darwin') {
+  app.setAboutPanelOptions({
+    applicationName: APP_DISPLAY_NAME,
+    applicationVersion: appVersion,
+  });
+}
 
 function createMenu() {
   if (!mainWindow) return;
@@ -27,14 +44,14 @@ function createMenu() {
           label: 'Open File...',
           accelerator: 'CmdOrCtrl+O',
           click: () => {
-            mainWindow?.webContents.send('menu:openFile');
+            safeSend(mainWindow, 'menu:openFile');
           },
         },
         {
           label: 'Save Transcription...',
           accelerator: 'CmdOrCtrl+S',
           click: () => {
-            mainWindow?.webContents.send('menu:saveFile');
+            safeSend(mainWindow, 'menu:saveFile');
           },
         },
         { type: 'separator' as const },
@@ -60,7 +77,7 @@ function createMenu() {
           label: 'Copy All Transcription',
           accelerator: 'CmdOrCtrl+C',
           click: () => {
-            mainWindow?.webContents.send('menu:copyTranscription');
+            safeSend(mainWindow, 'menu:copyTranscription');
           },
         },
       ],
@@ -81,7 +98,7 @@ function createMenu() {
           label: 'Toggle History',
           accelerator: 'CmdOrCtrl+H',
           click: () => {
-            mainWindow?.webContents.send('menu:toggleHistory');
+            safeSend(mainWindow, 'menu:toggleHistory');
           },
         },
       ],
@@ -93,14 +110,14 @@ function createMenu() {
           label: 'Start Transcription',
           accelerator: 'CmdOrCtrl+Enter',
           click: () => {
-            mainWindow?.webContents.send('menu:startTranscription');
+            safeSend(mainWindow, 'menu:startTranscription');
           },
         },
         {
           label: 'Cancel Transcription',
           accelerator: 'Escape',
           click: () => {
-            mainWindow?.webContents.send('menu:cancelTranscription');
+            safeSend(mainWindow, 'menu:cancelTranscription');
           },
         },
       ],
@@ -201,6 +218,7 @@ const createWindow = () => {
       sandbox: true,
     },
     titleBarStyle: 'hiddenInset',
+    title: APP_DISPLAY_NAME,
     trafficLightPosition: { x: 20, y: 20 },
   });
 

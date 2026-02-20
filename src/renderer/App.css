@@ -97,6 +97,27 @@
   font-size: 0.9rem;
 }
 
+.queue-resume-banner {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.queue-resume-banner-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.queue-resume-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .right-panel {
   padding: 20px;
   display: flex;

@@ -132,6 +132,20 @@ export async function openExternal(url: string): Promise<void> {
   await window.electronAPI?.openExternal(url);
 }
 
+export async function showItemInFolder(
+  filePath: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await window.electronAPI?.showItemInFolder(filePath);
+    return result ?? { success: false, error: 'Electron API not available' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export function onMenuOpenFile(callback: () => void): Unsubscribe {
   return window.electronAPI?.onMenuOpenFile(callback) ?? (() => {});
 }

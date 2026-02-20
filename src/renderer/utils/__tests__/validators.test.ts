@@ -14,6 +14,9 @@ describe('validators', () => {
       expect(isValidMediaFile('song.m4a')).toBe(true);
       expect(isValidMediaFile('music.flac')).toBe(true);
       expect(isValidMediaFile('audio.ogg')).toBe(true);
+      expect(isValidMediaFile('voice.opus')).toBe(true);
+      expect(isValidMediaFile('note.oga')).toBe(true);
+      expect(isValidMediaFile('memo.amr')).toBe(true);
     });
 
     it('should return true for valid video extensions', () => {

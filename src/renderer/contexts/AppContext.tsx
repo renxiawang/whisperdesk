@@ -55,10 +55,17 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   const {
     queue,
     isProcessing,
+    duplicateFilesSkipped,
+    estimatedTimeRemainingSec,
+    showQueueResumePrompt,
+    restoredQueueItemsCount,
     addFiles,
     removeFile,
     clearCompleted,
+    dismissQueueResumePrompt,
+    resumePersistedQueue,
     startProcessing,
+    retryFailed,
     cancelProcessing,
     getCompletedTranscription,
   } = useBatchQueue({
@@ -100,6 +107,10 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   const handleTranscribe = useCallback(async (): Promise<void> => {
     await startProcessing();
   }, [startProcessing]);
+
+  const handleRetryFailed = useCallback(async (): Promise<void> => {
+    await retryFailed();
+  }, [retryFailed]);
 
   const handleCancel = useCallback(async (): Promise<void> => {
     await cancelProcessing();
@@ -199,6 +210,10 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       transcription,
       error,
       modelDownloaded,
+      duplicateFilesSkipped,
+      estimatedTimeRemainingSec,
+      showQueueResumePrompt,
+      restoredQueueItemsCount,
       copySuccess,
       queue,
       selectedQueueItemId,
@@ -210,6 +225,10 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       transcription,
       error,
       modelDownloaded,
+      duplicateFilesSkipped,
+      estimatedTimeRemainingSec,
+      showQueueResumePrompt,
+      restoredQueueItemsCount,
       copySuccess,
       queue,
       selectedQueueItemId,
@@ -222,6 +241,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       setSettings,
       setModelDownloaded,
       handleTranscribe,
+      handleRetryFailed,
       handleCancel,
       handleSave,
       handleCopy: onCopy,
@@ -229,12 +249,15 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       removeFromQueue,
       clearCompletedFromQueue,
       selectQueueItem,
+      dismissQueueResumePrompt,
+      resumePersistedQueue,
     }),
     [
       setSelectedFile,
       setSettings,
       setModelDownloaded,
       handleTranscribe,
+      handleRetryFailed,
       handleCancel,
       handleSave,
       onCopy,
@@ -242,6 +265,8 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       removeFromQueue,
       clearCompletedFromQueue,
       selectQueueItem,
+      dismissQueueResumePrompt,
+      resumePersistedQueue,
     ]
   );
 
