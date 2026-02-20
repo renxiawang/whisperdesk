@@ -513,6 +513,8 @@ export function transcribe(
         outputBase,
       ];
 
+      // whisper.cpp defaults to English when -l is omitted.
+      // Pass 'auto' explicitly to enable language auto-detection.
       if (language) {
         args.push('-l', language);
       }

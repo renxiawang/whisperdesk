@@ -246,10 +246,11 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
         return { success: false, error: 'Invalid file path' };
       }
 
-      const resolvedPath = path.resolve(filePath);
-      if (!path.isAbsolute(resolvedPath)) {
+      if (!path.isAbsolute(filePath)) {
         return { success: false, error: 'Invalid file path' };
       }
+
+      const resolvedPath = path.resolve(filePath);
 
       if (!fs.existsSync(resolvedPath)) {
         return { success: false, error: 'File not found' };
