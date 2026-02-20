@@ -12,6 +12,7 @@ export interface FileQueueProps {
   onRetryFailed: () => void;
   onSelectItem?: (id: string) => void;
   selectedItemId?: string | null;
+  estimatedTimeRemainingSec?: number | null;
   disabled?: boolean;
 }
 
@@ -32,6 +33,23 @@ function getStatusIcon(status: QueueItemStatus): React.ReactNode {
   }
 }
 
+function formatEstimatedTime(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  if (totalSeconds < 3600) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const remainingMinutes = Math.floor((totalSeconds % 3600) / 60);
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 function FileQueue({
   queue,
   onRemove,
@@ -39,6 +57,7 @@ function FileQueue({
   onRetryFailed,
   onSelectItem,
   selectedItemId,
+  estimatedTimeRemainingSec = null,
   disabled = false,
 }: FileQueueProps): React.JSX.Element | null {
   if (queue.length === 0) {
@@ -152,6 +171,14 @@ function FileQueue({
       <div className="file-queue-summary">
         {completedCount > 0 && <span>{completedCount} completed</span>}
         {processingCount > 0 && <span>{processingCount} processing</span>}
+        {processingCount > 0 && (
+          <span className="eta">
+            ETA{' '}
+            {typeof estimatedTimeRemainingSec === 'number'
+              ? formatEstimatedTime(estimatedTimeRemainingSec)
+              : 'calculating...'}
+          </span>
+        )}
         {pendingCount > 0 && <span>{pendingCount} pending</span>}
         {errorCount > 0 && <span className="error">{errorCount} failed</span>}
         {completedCount > 0 && !processingCount && (

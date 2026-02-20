@@ -198,6 +198,10 @@
   color: var(--danger);
 }
 
+.file-queue-summary span.eta {
+  color: var(--accent);
+}
+
 .file-queue-summary span.hint {
   color: var(--accent);
   font-style: italic;

@@ -16,6 +16,7 @@ function LeftPanel(): React.JSX.Element {
     setModelDownloaded,
     queue,
     duplicateFilesSkipped,
+    estimatedTimeRemainingSec,
     selectedQueueItemId,
     handleFilesSelect,
     removeFromQueue,
@@ -50,6 +51,7 @@ function LeftPanel(): React.JSX.Element {
           onRetryFailed={handleRetryFailed}
           onSelectItem={selectQueueItem}
           selectedItemId={selectedQueueItemId}
+          estimatedTimeRemainingSec={estimatedTimeRemainingSec}
           disabled={isTranscribing}
         />
       )}

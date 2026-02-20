@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useBatchQueue } from '../hooks/useBatchQueue';
 import { overrideElectronAPI } from '@/test/utils';
 import type {
@@ -11,6 +11,8 @@ import type {
 import { logger } from '@/services/logger';
 
 describe('useBatchQueue', () => {
+  const originalNotification = globalThis.Notification;
+
   const mockSettings: TranscriptionSettings = {
     model: 'base',
     language: 'en',
@@ -43,6 +45,40 @@ describe('useBatchQueue', () => {
     });
   });
 
+  afterEach(() => {
+    if (originalNotification) {
+      Object.defineProperty(globalThis, 'Notification', {
+        configurable: true,
+        writable: true,
+        value: originalNotification,
+      });
+    } else {
+      Reflect.deleteProperty(globalThis, 'Notification');
+    }
+  });
+
+  const mockNotificationApi = (permission: NotificationPermission = 'granted') => {
+    const notificationSpy = vi.fn();
+    const requestPermissionSpy = vi.fn().mockResolvedValue(permission);
+
+    class MockNotification {
+      static permission: NotificationPermission = permission;
+      static requestPermission = requestPermissionSpy;
+
+      constructor(title: string, options?: NotificationOptions) {
+        notificationSpy({ title, options });
+      }
+    }
+
+    Object.defineProperty(globalThis, 'Notification', {
+      configurable: true,
+      writable: true,
+      value: MockNotification,
+    });
+
+    return { notificationSpy, requestPermissionSpy };
+  };
+
   describe('initialization', () => {
     it('should initialize with empty queue', () => {
       const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
@@ -50,6 +86,7 @@ describe('useBatchQueue', () => {
       expect(result.current.queue).toEqual([]);
       expect(result.current.isProcessing).toBe(false);
       expect(result.current.currentItemId).toBe(null);
+      expect(result.current.estimatedTimeRemainingSec).toBeNull();
     });
   });
 
@@ -322,18 +359,12 @@ describe('useBatchQueue', () => {
     });
 
     it('should not start if already processing', async () => {
+      let resolveTranscription: ((value: TranscriptionResult) => void) | undefined;
       const startTranscriptionMock = vi.fn().mockImplementation(
         () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  success: true,
-                  text: 'text',
-                }),
-              100
-            )
-          )
+          new Promise<TranscriptionResult>((resolve) => {
+            resolveTranscription = resolve;
+          })
       );
 
       overrideElectronAPI({
@@ -344,14 +375,12 @@ describe('useBatchQueue', () => {
       const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
 
       act(() => {
-        result.current.addFiles([
-          createMockSelectedFile('audio1.mp3'),
-          createMockSelectedFile('audio2.mp3'),
-        ]);
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
       });
 
+      let processingPromise: Promise<void>;
       act(() => {
-        result.current.startProcessing();
+        processingPromise = result.current.startProcessing();
       });
 
       expect(result.current.isProcessing).toBe(true);
@@ -361,6 +390,11 @@ describe('useBatchQueue', () => {
       });
 
       expect(startTranscriptionMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveTranscription?.({ success: true, text: 'text' });
+        await processingPromise;
+      });
     });
 
     it('should handle transcription errors', async () => {
@@ -459,6 +493,57 @@ describe('useBatchQueue', () => {
       });
 
       expect(result.current.isProcessing).toBe(false);
+    });
+
+    it('should expose estimated time remaining while processing subsequent items', async () => {
+      let now = 1000;
+      const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+      let resolveSecond: ((value: TranscriptionResult) => void) | undefined;
+      const startTranscriptionMock = vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          now = 6000;
+          return { success: true, text: 'first' };
+        })
+        .mockImplementationOnce(
+          () =>
+            new Promise<TranscriptionResult>((resolve) => {
+              resolveSecond = resolve;
+            })
+        );
+
+      overrideElectronAPI({
+        startTranscription: startTranscriptionMock,
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([
+          createMockSelectedFile('audio1.mp3'),
+          createMockSelectedFile('audio2.mp3'),
+        ]);
+      });
+
+      let processingPromise: Promise<void>;
+      act(() => {
+        processingPromise = result.current.startProcessing();
+      });
+
+      await waitFor(() => {
+        expect(result.current.estimatedTimeRemainingSec).toBe(5);
+      });
+
+      await act(async () => {
+        now = 11000;
+        resolveSecond?.({ success: true, text: 'second' });
+        await processingPromise;
+      });
+
+      expect(result.current.estimatedTimeRemainingSec).toBeNull();
+      nowSpy.mockRestore();
     });
   });
 
@@ -742,6 +827,174 @@ describe('useBatchQueue', () => {
       expect(result.current.queue[0]!.status).toBe('cancelled');
 
       expect(result.current.queue[1]!.status).toBe('cancelled');
+    });
+  });
+
+  describe('completion notifications', () => {
+    it('should notify once when processing completes and permission is granted', async () => {
+      const { notificationSpy } = mockNotificationApi('granted');
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([
+          createMockSelectedFile('audio1.mp3'),
+          createMockSelectedFile('audio2.mp3'),
+        ]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(notificationSpy).toHaveBeenCalledTimes(1);
+      expect(notificationSpy).toHaveBeenCalledWith({
+        title: 'Batch transcription complete',
+        options: { body: '2 completed' },
+      });
+    });
+
+    it('should request permission and notify when permission starts as default', async () => {
+      const { notificationSpy, requestPermissionSpy } = mockNotificationApi('default');
+      requestPermissionSpy.mockResolvedValueOnce('granted');
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      await waitFor(() => {
+        expect(requestPermissionSpy).toHaveBeenCalledTimes(1);
+        expect(notificationSpy).toHaveBeenCalledWith({
+          title: 'Transcription complete',
+          options: { body: '1 completed' },
+        });
+      });
+    });
+
+    it('should not notify if permission is denied after requesting', async () => {
+      const { notificationSpy, requestPermissionSpy } = mockNotificationApi('default');
+      requestPermissionSpy.mockResolvedValueOnce('denied');
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      await waitFor(() => {
+        expect(requestPermissionSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(notificationSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not notify when processing was cancelled', async () => {
+      const { notificationSpy } = mockNotificationApi('granted');
+      let resolveTranscription: ((value: TranscriptionResult) => void) | undefined;
+
+      overrideElectronAPI({
+        startTranscription: vi.fn().mockImplementation(
+          () =>
+            new Promise<TranscriptionResult>((resolve) => {
+              resolveTranscription = resolve;
+            })
+        ),
+        cancelTranscription: vi.fn().mockResolvedValue({ success: true }),
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      let processingPromise: Promise<void>;
+      act(() => {
+        processingPromise = result.current.startProcessing();
+      });
+
+      await act(async () => {
+        await result.current.cancelProcessing();
+      });
+
+      await act(async () => {
+        resolveTranscription?.({ success: true, text: 'Done' });
+        await processingPromise;
+      });
+
+      expect(notificationSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log warning when notification creation throws', async () => {
+      const requestPermissionSpy = vi.fn().mockResolvedValue('granted');
+
+      class MockNotification {
+        static permission: NotificationPermission = 'granted';
+        static requestPermission = requestPermissionSpy;
+
+        constructor() {
+          throw new Error('constructor failed');
+        }
+      }
+
+      Object.defineProperty(globalThis, 'Notification', {
+        configurable: true,
+        writable: true,
+        value: MockNotification,
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(logger.warn).toHaveBeenCalledWith('Failed to create completion notification', {
+        error: 'constructor failed',
+      });
+    });
+
+    it('should log warning when notification permission lookup throws', async () => {
+      class MockNotification {
+        static get permission(): NotificationPermission {
+          throw new Error('permission failed');
+        }
+
+        static requestPermission = vi.fn().mockResolvedValue('granted');
+
+        constructor() {}
+      }
+
+      Object.defineProperty(globalThis, 'Notification', {
+        configurable: true,
+        writable: true,
+        value: MockNotification,
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(logger.warn).toHaveBeenCalledWith('Failed to show completion notification', {
+        error: 'permission failed',
+      });
     });
   });
 });

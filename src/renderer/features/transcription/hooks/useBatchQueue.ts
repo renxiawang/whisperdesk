@@ -25,6 +25,7 @@ interface UseBatchQueueReturn {
   isProcessing: boolean;
   currentItemId: string | null;
   duplicateFilesSkipped: number;
+  estimatedTimeRemainingSec: number | null;
 
   addFiles: (files: SelectedFile[]) => void;
   removeFile: (id: string) => void;
@@ -49,6 +50,56 @@ function getFileIdentityKey(file: SelectedFile): string {
   return `path:${file.path}`;
 }
 
+function showBatchCompletionNotification(items: QueueItem[]): void {
+  if (typeof Notification === 'undefined' || items.length === 0) {
+    return;
+  }
+
+  const completedCount = items.filter((item) => item.status === 'completed').length;
+  const failedCount = items.filter((item) => item.status === 'error').length;
+  const cancelledCount = items.filter((item) => item.status === 'cancelled').length;
+
+  const title = items.length > 1 ? 'Batch transcription complete' : 'Transcription complete';
+  const summaryParts: string[] = [];
+
+  if (completedCount > 0) summaryParts.push(`${completedCount} completed`);
+  if (failedCount > 0) summaryParts.push(`${failedCount} failed`);
+  if (cancelledCount > 0) summaryParts.push(`${cancelledCount} cancelled`);
+
+  const body = summaryParts.length > 0 ? summaryParts.join(' • ') : `${items.length} processed`;
+
+  const notify = (): void => {
+    try {
+      new Notification(title, { body });
+    } catch (error) {
+      logger.warn('Failed to create completion notification', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  try {
+    if (Notification.permission === 'granted') {
+      notify();
+      return;
+    }
+
+    if (Notification.permission === 'default') {
+      void Notification.requestPermission()
+        .then((permission) => {
+          if (permission === 'granted') {
+            notify();
+          }
+        })
+        .catch(() => {});
+    }
+  } catch (error) {
+    logger.warn('Failed to show completion notification', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueReturn {
   const { settings, onHistoryAdd, onFirstComplete } = options;
 
@@ -56,6 +107,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
   const [duplicateFilesSkipped, setDuplicateFilesSkipped] = useState(0);
+  const [estimatedTimeRemainingSec, setEstimatedTimeRemainingSec] = useState<number | null>(null);
 
   const isCancelledRef = useRef(false);
   const hasCalledFirstCompleteRef = useRef(false);
@@ -177,6 +229,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         if (isCancelledRef.current) {
           return {
             ...item,
+            startTime,
             status: 'cancelled',
             endTime,
           };
@@ -187,6 +240,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
           logger.error('Batch item failed', { id: item.id, error });
           return {
             ...item,
+            startTime,
             status: 'error',
             error,
             endTime,
@@ -196,6 +250,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         if (result.cancelled) {
           return {
             ...item,
+            startTime,
             status: 'cancelled',
             endTime,
           };
@@ -204,6 +259,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         if (!result.text) {
           return {
             ...item,
+            startTime,
             status: 'error',
             error: 'Transcription produced no output',
             endTime,
@@ -237,6 +293,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
         return {
           ...item,
+          startTime,
           status: 'completed',
           result,
           progress: { percent: 100, status: 'Complete!' },
@@ -247,6 +304,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         logger.error('Batch item threw error', { id: item.id, error: err });
         return {
           ...item,
+          startTime,
           status: 'error',
           error,
           endTime: Date.now(),
@@ -274,6 +332,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
       const activeIds = new Set(itemsToProcess.map((item) => item.id));
       activeRunItemIdsRef.current = activeIds;
+      setEstimatedTimeRemainingSec(null);
 
       setQueue((prev) =>
         prev.map((item) =>
@@ -294,7 +353,13 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
       logger.info('Starting batch processing', { count: itemsToProcess.length });
 
-      for (const item of itemsToProcess) {
+      const processedDurationsMs: number[] = [];
+      const processedItems: QueueItem[] = [];
+
+      for (let index = 0; index < itemsToProcess.length; index++) {
+        const item = itemsToProcess[index];
+        if (!item) continue;
+
         if (isCancelledRef.current) {
           setQueue((prev) =>
             prev.map((q) =>
@@ -308,12 +373,42 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
         const resetItem = { ...item, status: 'pending' as QueueItemStatus, error: undefined };
         const processedItem = await processItem(resetItem);
+        processedItems.push(processedItem);
         setQueue((prev) => prev.map((q) => (q.id === processedItem.id ? processedItem : q)));
+
+        if (
+          typeof processedItem.startTime === 'number' &&
+          typeof processedItem.endTime === 'number' &&
+          processedItem.endTime >= processedItem.startTime
+        ) {
+          processedDurationsMs.push(processedItem.endTime - processedItem.startTime);
+        }
+
+        const remainingItemsCount = itemsToProcess.length - (index + 1);
+        if (remainingItemsCount <= 0) {
+          setEstimatedTimeRemainingSec(0);
+        } else if (processedDurationsMs.length > 0) {
+          const averageDurationMs =
+            processedDurationsMs.reduce((total, value) => total + value, 0) /
+            processedDurationsMs.length;
+          const estimatedSeconds = Math.max(
+            1,
+            Math.round((averageDurationMs * remainingItemsCount) / 1000)
+          );
+          setEstimatedTimeRemainingSec(estimatedSeconds);
+        }
       }
 
+      const wasCancelled = isCancelledRef.current;
       setIsProcessing(false);
       setCurrentItemId(null);
       activeRunItemIdsRef.current = new Set();
+      setEstimatedTimeRemainingSec(null);
+
+      if (!wasCancelled) {
+        showBatchCompletionNotification(processedItems);
+      }
+
       logger.info('Batch processing complete');
     },
     [isProcessing, queue, processItem]
@@ -335,6 +430,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
     setIsProcessing(false);
     setCurrentItemId(null);
+    setEstimatedTimeRemainingSec(null);
 
     setQueue((prev) =>
       prev.map((q) =>
@@ -369,6 +465,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     isProcessing,
     currentItemId,
     duplicateFilesSkipped,
+    estimatedTimeRemainingSec,
 
     addFiles,
     removeFile,

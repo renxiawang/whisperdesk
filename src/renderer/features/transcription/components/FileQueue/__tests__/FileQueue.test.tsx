@@ -227,6 +227,48 @@ describe('FileQueue', () => {
       expect(screen.getByText('1 processing')).toBeInTheDocument();
     });
 
+    it('should show eta in seconds for short remaining time', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={45} />);
+      expect(screen.getByText('ETA 45s')).toBeInTheDocument();
+    });
+
+    it('should show eta in minutes and seconds', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={90} />);
+      expect(screen.getByText('ETA 1m 30s')).toBeInTheDocument();
+    });
+
+    it('should show eta in whole minutes when no remaining seconds', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={120} />);
+      expect(screen.getByText('ETA 2m')).toBeInTheDocument();
+    });
+
+    it('should show eta in hours when needed', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={7200} />);
+      expect(screen.getByText('ETA 2h')).toBeInTheDocument();
+    });
+
+    it('should show eta in hours and minutes when needed', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={7260} />);
+      expect(screen.getByText('ETA 2h 1m')).toBeInTheDocument();
+    });
+
+    it('should show eta as calculating while processing if estimate is not ready', () => {
+      const queue = [createMockQueueItem({ status: 'processing' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={null} />);
+      expect(screen.getByText('ETA calculating...')).toBeInTheDocument();
+    });
+
+    it('should not show eta when no items are processing', () => {
+      const queue = [createMockQueueItem({ status: 'pending' })];
+      render(<FileQueue {...defaultProps} queue={queue} estimatedTimeRemainingSec={45} />);
+      expect(screen.queryByText(/ETA/)).not.toBeInTheDocument();
+    });
+
     it('should show failed count', () => {
       const queue = [createMockQueueItem({ status: 'error', error: 'Failed' })];
       render(<FileQueue {...defaultProps} queue={queue} />);

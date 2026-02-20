@@ -8,6 +8,9 @@ import packageJson from '../../package.json';
 
 initAnalytics();
 
+const APP_DISPLAY_NAME = 'WhisperDesk';
+const APP_USER_MODEL_ID = 'com.whisperdesk.app';
+
 let mainWindow: BrowserWindow | null = null;
 let ipcHandlersRegistered = false;
 
@@ -15,6 +18,19 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const appVersion = packageJson.version;
 
 const UPDATE_CHECK_DELAY_MS = 3000;
+
+app.setName(APP_DISPLAY_NAME);
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+
+if (process.platform === 'darwin') {
+  app.setAboutPanelOptions({
+    applicationName: APP_DISPLAY_NAME,
+    applicationVersion: appVersion,
+  });
+}
 
 function createMenu() {
   if (!mainWindow) return;
@@ -201,6 +217,7 @@ const createWindow = () => {
       sandbox: true,
     },
     titleBarStyle: 'hiddenInset',
+    title: APP_DISPLAY_NAME,
     trafficLightPosition: { x: 20, y: 20 },
   });
 
