@@ -2,6 +2,7 @@ import { autoUpdater } from 'electron-updater';
 import type { BrowserWindow } from 'electron';
 import type { UpdateInfo, UpdateProgress } from '../../shared/types';
 import { trackEvent, AnalyticsEvents } from './analytics';
+import { safeSend } from '../utils/safe-send';
 import log from 'electron-log';
 
 autoUpdater.logger = log;
@@ -24,7 +25,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
     updateCheckInProgress = true;
     log.info('Checking for updates...');
     const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'checking',
     });
     trackEvent(AnalyticsEvents.UPDATE_CHECKING);
@@ -39,7 +40,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
       releaseDate: info.releaseDate,
       releaseNotes: info.releaseNotes as string | undefined,
     };
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'available',
       info: updateInfo,
     });
@@ -50,7 +51,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
     updateCheckInProgress = false;
     log.info('No updates available');
     const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'not-available',
     });
     trackEvent(AnalyticsEvents.UPDATE_NOT_AVAILABLE);
@@ -60,7 +61,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
     updateCheckInProgress = false;
     log.error('Update error:', error);
     const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'error',
       error: error.message,
     });
@@ -77,7 +78,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
       transferred: progressObj.transferred,
       total: progressObj.total,
     };
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'downloading',
       progress,
     });
@@ -90,7 +91,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null) {
       releaseDate: info.releaseDate,
       releaseNotes: info.releaseNotes as string | undefined,
     };
-    mainWindow?.webContents.send('update:status', {
+    safeSend(mainWindow, 'update:status', {
       status: 'downloaded',
       info: updateInfo,
     });

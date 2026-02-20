@@ -47,7 +47,14 @@ export async function generateFileFingerprint(filePath: string, fileSize: number
     throw error;
   } finally {
     if (fileHandle !== null) {
-      await fileHandle.close();
+      try {
+        await fileHandle.close();
+      } catch (closeError) {
+        console.warn('Failed to close file after generating fingerprint', {
+          file: sanitizePath(filePath),
+          error: closeError instanceof Error ? closeError.message : String(closeError),
+        });
+      }
     }
   }
 

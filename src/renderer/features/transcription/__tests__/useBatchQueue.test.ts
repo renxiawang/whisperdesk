@@ -211,6 +211,28 @@ describe('useBatchQueue', () => {
       });
     });
 
+    it('should detect duplicates against restored queue before effects run', () => {
+      localStorage.setItem(
+        QUEUE_STORAGE_KEY,
+        JSON.stringify([
+          {
+            id: 'restored-1',
+            file: { name: 'audio1.mp3', path: '/path/to/audio1.mp3', size: 1024 },
+            status: 'pending',
+          },
+        ])
+      );
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      expect(result.current.queue).toHaveLength(1);
+      expect(result.current.duplicateFilesSkipped).toBe(1);
+    });
+
     it('should skip content duplicates using fingerprint even with different file paths', () => {
       const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
 

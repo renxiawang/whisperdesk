@@ -17,6 +17,7 @@ import {
   generateMarkdownDocument,
 } from '../utils/export-helper';
 import { generateFileFingerprint } from '../utils/media-info';
+import { safeSend } from '../utils/safe-send';
 import { trackEvent, AnalyticsEvents } from '../services/analytics';
 import { SUPPORTED_EXTENSIONS } from '../../shared/types';
 import type { TranscriptionOptions, SaveFileOptions } from '../../shared/types';
@@ -126,7 +127,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('models:download', async (_event, modelName: string) => {
     try {
       const result = await downloadModel(modelName, (progress) => {
-        getMainWindow()?.webContents.send('models:downloadProgress', progress);
+        safeSend(getMainWindow(), 'models:downloadProgress', progress);
       });
       if (result.success) {
         trackEvent(AnalyticsEvents.MODEL_DOWNLOADED, { model: modelName });
@@ -150,7 +151,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('transcribe:start', async (_event, options: TranscriptionOptions) => {
     try {
       const promise = transcribe(options, (progress) => {
-        getMainWindow()?.webContents.send('transcribe:progress', progress);
+        safeSend(getMainWindow(), 'transcribe:progress', progress);
       });
 
       currentTranscription = promise;
@@ -252,7 +253,9 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
       const resolvedPath = path.resolve(filePath);
 
-      if (!fs.existsSync(resolvedPath)) {
+      try {
+        await fs.promises.access(resolvedPath, fs.constants.F_OK);
+      } catch {
         return { success: false, error: 'File not found' };
       }
 

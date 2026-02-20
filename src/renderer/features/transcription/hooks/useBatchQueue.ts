@@ -241,6 +241,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const progressUnsubscribeRef = useRef<(() => void) | null>(null);
   const queueRef = useRef<QueueItem[]>(queue);
   const initialQueueLengthRef = useRef(queue.length);
+  const shouldPersistQueueRef = useRef(true);
   const lastPersistedQueueSnapshotRef = useRef<string | null>(null);
   const activeRunItemIdsRef = useRef<Set<string>>(new Set());
   const currentItemStartTimeRef = useRef<number | null>(null);
@@ -255,7 +256,14 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   }, []);
 
   useEffect(() => {
+    // Always keep the latest queue in ref for add/remove calculations.
     queueRef.current = queue;
+
+    // Persist only for structural/status changes, not progress ticks.
+    if (!shouldPersistQueueRef.current) {
+      return;
+    }
+    shouldPersistQueueRef.current = false;
 
     const resumableItems = getResumableQueueItems(queue);
 
@@ -307,6 +315,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     }, []);
 
     if (newItems.length > 0) {
+      shouldPersistQueueRef.current = true;
       queueRef.current = [...queueRef.current, ...newItems];
       setQueue((prev) => [...prev, ...newItems]);
       logger.info('Added files to batch queue', {
@@ -326,11 +335,13 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   }, []);
 
   const removeFile = useCallback((id: string) => {
+    shouldPersistQueueRef.current = true;
     setQueue((prev) => prev.filter((item) => item.id !== id));
     logger.info('Removed file from batch queue', { id });
   }, []);
 
   const clearCompleted = useCallback(() => {
+    shouldPersistQueueRef.current = true;
     setQueue((prev) =>
       prev.filter((item) => item.status !== 'completed' && item.status !== 'cancelled')
     );
@@ -342,6 +353,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
       logger.warn('Cannot clear queue while processing');
       return;
     }
+    shouldPersistQueueRef.current = true;
     setQueue([]);
     setShowQueueResumePrompt(false);
     setRestoredQueueItemsCount(0);
@@ -357,6 +369,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     async (item: QueueItem): Promise<QueueItem> => {
       const startTime = Date.now();
 
+      shouldPersistQueueRef.current = true;
       setQueue((prev) =>
         prev.map((q) =>
           q.id === item.id ? { ...q, status: 'processing' as QueueItemStatus, startTime } : q
@@ -525,6 +538,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
       activeRunItemIdsRef.current = activeIds;
       setEstimatedTimeRemainingSec(null);
 
+      shouldPersistQueueRef.current = true;
       setQueue((prev) =>
         prev.map((item) =>
           activeIds.has(item.id) && (item.status === 'cancelled' || item.status === 'error')
@@ -552,6 +566,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         if (!item) continue;
 
         if (isCancelledRef.current) {
+          shouldPersistQueueRef.current = true;
           setQueue((prev) =>
             prev.map((q) =>
               q.status === 'pending' && activeIds.has(q.id)
@@ -567,6 +582,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         const processedItem = await processItem(resetItem);
         currentItemStartTimeRef.current = null;
         processedItems.push(processedItem);
+        shouldPersistQueueRef.current = true;
         setQueue((prev) => prev.map((q) => (q.id === processedItem.id ? processedItem : q)));
 
         if (
@@ -635,6 +651,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     remainingPendingCountRef.current = 0;
     setEstimatedTimeRemainingSec(null);
 
+    shouldPersistQueueRef.current = true;
     setQueue((prev) =>
       prev.map((q) =>
         q.status === 'processing' ||
