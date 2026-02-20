@@ -30,6 +30,7 @@ export interface TranscriptionStateContextValue {
   transcription: string;
   error: string | null;
   modelDownloaded: boolean;
+  duplicateFilesSkipped: number;
   copySuccess: boolean;
   queue: QueueItem[];
   selectedQueueItemId: string | null;

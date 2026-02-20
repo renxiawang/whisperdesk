@@ -55,6 +55,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   const {
     queue,
     isProcessing,
+    duplicateFilesSkipped,
     addFiles,
     removeFile,
     clearCompleted,
@@ -199,6 +200,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       transcription,
       error,
       modelDownloaded,
+      duplicateFilesSkipped,
       copySuccess,
       queue,
       selectedQueueItemId,
@@ -210,6 +212,7 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
       transcription,
       error,
       modelDownloaded,
+      duplicateFilesSkipped,
       copySuccess,
       queue,
       selectedQueueItemId,

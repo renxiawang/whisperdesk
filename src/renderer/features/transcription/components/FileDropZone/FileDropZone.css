@@ -78,3 +78,14 @@
   font-weight: 500;
   color: var(--accent);
 }
+
+.dropzone-duplicate-badge {
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--warning-dark);
+}

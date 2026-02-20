@@ -8,12 +8,14 @@ import './FileDropZone.css';
 export interface FileDropZoneProps {
   onFilesSelect: (files: SelectedFile[]) => void;
   queueCount?: number;
+  duplicateFilesSkipped?: number;
   disabled: boolean;
 }
 
 function FileDropZone({
   onFilesSelect,
   queueCount = 0,
+  duplicateFilesSkipped = 0,
   disabled,
 }: FileDropZoneProps): React.JSX.Element {
   const handleClick = async (): Promise<void> => {
@@ -81,6 +83,12 @@ function FileDropZone({
         <span className="dropzone-formats">MP3, WAV, M4A, FLAC, OGG, MP4, MOV, AVI, MKV, WEBM</span>
         {queueCount > 0 && (
           <span className="dropzone-queue-badge">{queueCount} files in queue</span>
+        )}
+        {duplicateFilesSkipped > 0 && (
+          <span className="dropzone-duplicate-badge" role="status" aria-live="polite">
+            Skipped {duplicateFilesSkipped} duplicate file
+            {duplicateFilesSkipped > 1 ? 's' : ''}
+          </span>
         )}
       </div>
     </div>

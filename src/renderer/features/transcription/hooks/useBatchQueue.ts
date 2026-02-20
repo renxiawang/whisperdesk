@@ -24,6 +24,7 @@ interface UseBatchQueueReturn {
   queue: QueueItem[];
   isProcessing: boolean;
   currentItemId: string | null;
+  duplicateFilesSkipped: number;
 
   addFiles: (files: SelectedFile[]) => void;
   removeFile: (id: string) => void;
@@ -40,16 +41,29 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+function getFileIdentityKey(file: SelectedFile): string {
+  if (file.fingerprint) {
+    return `fingerprint:${file.fingerprint}`;
+  }
+  return `path:${file.path}`;
+}
+
 export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueReturn {
   const { settings, onHistoryAdd, onFirstComplete } = options;
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
+  const [duplicateFilesSkipped, setDuplicateFilesSkipped] = useState(0);
 
   const isCancelledRef = useRef(false);
   const hasCalledFirstCompleteRef = useRef(false);
   const progressUnsubscribeRef = useRef<(() => void) | null>(null);
+  const queueRef = useRef<QueueItem[]>([]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
 
   useEffect(() => {
     return () => {
@@ -61,19 +75,43 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   }, []);
 
   const addFiles = useCallback((files: SelectedFile[]) => {
-    const newItems: QueueItem[] = files.map((file) => ({
-      id: generateId(),
-      file,
-      status: 'pending' as QueueItemStatus,
-      progress: { percent: 0, status: '' },
-    }));
+    const existingKeys = new Set(queueRef.current.map((item) => getFileIdentityKey(item.file)));
+    const duplicateFiles: SelectedFile[] = [];
 
-    setQueue((prev) => [...prev, ...newItems]);
+    const newItems: QueueItem[] = files.reduce<QueueItem[]>((items, file) => {
+      const identityKey = getFileIdentityKey(file);
+      if (existingKeys.has(identityKey)) {
+        duplicateFiles.push(file);
+        return items;
+      }
 
-    logger.info('Added files to batch queue', {
-      count: files.length,
-      files: files.map((f) => f.name),
-    });
+      existingKeys.add(identityKey);
+      items.push({
+        id: generateId(),
+        file,
+        status: 'pending' as QueueItemStatus,
+        progress: { percent: 0, status: '' },
+      });
+      return items;
+    }, []);
+
+    if (newItems.length > 0) {
+      queueRef.current = [...queueRef.current, ...newItems];
+      setQueue((prev) => [...prev, ...newItems]);
+      logger.info('Added files to batch queue', {
+        count: newItems.length,
+        files: newItems.map((item) => item.file.name),
+      });
+    }
+
+    setDuplicateFilesSkipped(duplicateFiles.length);
+
+    if (duplicateFiles.length > 0) {
+      logger.warn('Skipped duplicate files in batch queue', {
+        count: duplicateFiles.length,
+        files: duplicateFiles.map((file) => file.name),
+      });
+    }
   }, []);
 
   const removeFile = useCallback((id: string) => {
@@ -307,6 +345,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     queue,
     isProcessing,
     currentItemId,
+    duplicateFilesSkipped,
 
     addFiles,
     removeFile,

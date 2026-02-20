@@ -2,6 +2,7 @@ export interface SelectedFile {
   name: string;
   path: string;
   size?: number;
+  fingerprint?: string;
 }
 
 export type WhisperModelName =

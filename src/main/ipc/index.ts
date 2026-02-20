@@ -16,6 +16,7 @@ import {
   generatePdfDocument,
   generateMarkdownDocument,
 } from '../utils/export-helper';
+import { generateFileFingerprint } from '../utils/media-info';
 import { trackEvent, AnalyticsEvents } from '../services/analytics';
 import type { TranscriptionOptions, SaveFileOptions } from '../../shared/types';
 
@@ -92,10 +93,18 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('file:getInfo', async (_event, filePath: string) => {
     try {
       const stats = fs.statSync(filePath);
+      let fingerprint: string | undefined;
+      try {
+        fingerprint = generateFileFingerprint(filePath, stats.size);
+      } catch {
+        fingerprint = undefined;
+      }
+
       return {
         name: path.basename(filePath),
         path: filePath,
         size: stats.size,
+        fingerprint,
       };
     } catch {
       return null;

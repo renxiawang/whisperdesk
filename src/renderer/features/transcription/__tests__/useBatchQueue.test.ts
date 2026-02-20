@@ -8,6 +8,7 @@ import type {
   TranscriptionResult,
   TranscriptionProgress,
 } from '@/types';
+import { logger } from '@/services/logger';
 
 describe('useBatchQueue', () => {
   const mockSettings: TranscriptionSettings = {
@@ -18,10 +19,14 @@ describe('useBatchQueue', () => {
   const mockOnHistoryAdd = vi.fn();
   const mockOnFirstComplete = vi.fn();
 
-  const createMockSelectedFile = (name: string): SelectedFile => ({
+  const createMockSelectedFile = (
+    name: string,
+    overrides: Partial<SelectedFile> = {}
+  ): SelectedFile => ({
     name,
     path: `/path/to/${name}`,
     size: 1024,
+    ...overrides,
   });
 
   beforeEach(() => {
@@ -75,6 +80,76 @@ describe('useBatchQueue', () => {
 
       const ids = result.current.queue.map((item) => item.id);
       expect(new Set(ids).size).toBe(2);
+    });
+
+    it('should skip duplicate file paths and expose skipped count', () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      const duplicateFile = createMockSelectedFile('audio1.mp3');
+      const newFile = createMockSelectedFile('audio2.mp3');
+
+      act(() => {
+        result.current.addFiles([duplicateFile]);
+      });
+
+      expect(result.current.queue).toHaveLength(1);
+      expect(result.current.duplicateFilesSkipped).toBe(0);
+
+      act(() => {
+        result.current.addFiles([duplicateFile, newFile, duplicateFile]);
+      });
+
+      expect(result.current.queue).toHaveLength(2);
+      expect(result.current.queue[0]!.file.path).toBe('/path/to/audio1.mp3');
+      expect(result.current.queue[1]!.file.path).toBe('/path/to/audio2.mp3');
+      expect(result.current.duplicateFilesSkipped).toBe(2);
+      expect(warnSpy).toHaveBeenCalledWith('Skipped duplicate files in batch queue', {
+        count: 2,
+        files: ['audio1.mp3', 'audio1.mp3'],
+      });
+    });
+
+    it('should skip content duplicates using fingerprint even with different file paths', () => {
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      const fingerprint = 'shared-fingerprint';
+      const originalFile = createMockSelectedFile('audio1.mp3', {
+        path: '/desktop/audio1.mp3',
+        fingerprint,
+      });
+      const copiedFile = createMockSelectedFile('audio1 copy.mp3', {
+        path: '/desktop/audio1 copy.mp3',
+        fingerprint,
+      });
+
+      act(() => {
+        result.current.addFiles([originalFile, copiedFile]);
+      });
+
+      expect(result.current.queue).toHaveLength(1);
+      expect(result.current.queue[0]!.file.path).toBe('/desktop/audio1.mp3');
+      expect(result.current.duplicateFilesSkipped).toBe(1);
+    });
+
+    it('should reset duplicate count when no duplicates are skipped', () => {
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      expect(result.current.duplicateFilesSkipped).toBe(1);
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio2.mp3')]);
+      });
+
+      expect(result.current.duplicateFilesSkipped).toBe(0);
     });
   });
 

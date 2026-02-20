@@ -108,6 +108,14 @@ describe('FileDropZone', () => {
     expect(screen.getByText('3 files in queue')).toBeInTheDocument();
   });
 
+  it('should show duplicate files skipped badge', () => {
+    render(
+      <FileDropZone onFilesSelect={onFilesSelect} disabled={false} duplicateFilesSkipped={2} />
+    );
+
+    expect(screen.getByText('Skipped 2 duplicate files')).toBeInTheDocument();
+  });
+
   it('should handle multiple files drop', async () => {
     overrideElectronAPI({
       getPathForFile: vi.fn((file) => `/path/to/${file.name}`),

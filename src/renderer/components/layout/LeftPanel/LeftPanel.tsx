@@ -15,6 +15,7 @@ function LeftPanel(): React.JSX.Element {
     setSettings,
     setModelDownloaded,
     queue,
+    duplicateFilesSkipped,
     selectedQueueItemId,
     handleFilesSelect,
     removeFromQueue,
@@ -36,6 +37,7 @@ function LeftPanel(): React.JSX.Element {
       <FileDropZone
         onFilesSelect={handleFilesSelect}
         queueCount={queue.length}
+        duplicateFilesSkipped={duplicateFilesSkipped}
         disabled={isTranscribing}
       />
 
