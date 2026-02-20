@@ -114,6 +114,8 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const progressUnsubscribeRef = useRef<(() => void) | null>(null);
   const queueRef = useRef<QueueItem[]>([]);
   const activeRunItemIdsRef = useRef<Set<string>>(new Set());
+  const currentItemStartTimeRef = useRef<number | null>(null);
+  const remainingPendingCountRef = useRef(0);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -199,6 +201,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         )
       );
       setCurrentItemId(item.id);
+      currentItemStartTimeRef.current = startTime;
 
       if (progressUnsubscribeRef.current) {
         progressUnsubscribeRef.current();
@@ -207,6 +210,32 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
       progressUnsubscribeRef.current = onTranscriptionProgress((progress) => {
         setQueue((prev) => prev.map((q) => (q.id === item.id ? { ...q, progress } : q)));
+
+        const startTimeMs = currentItemStartTimeRef.current;
+        const progressPercent = Number(progress.percent);
+
+        if (
+          isCancelledRef.current ||
+          startTimeMs === null ||
+          !Number.isFinite(progressPercent) ||
+          progressPercent <= 0 ||
+          progressPercent > 100
+        ) {
+          return;
+        }
+
+        const elapsedMs = Date.now() - startTimeMs;
+        if (elapsedMs <= 0) {
+          return;
+        }
+
+        const projectedItemDurationMs = elapsedMs / (progressPercent / 100);
+        const remainingCurrentMs = Math.max(0, projectedItemDurationMs - elapsedMs);
+        const remainingMs =
+          remainingCurrentMs + projectedItemDurationMs * remainingPendingCountRef.current;
+
+        const estimatedSeconds = Math.max(1, Math.round(remainingMs / 1000));
+        setEstimatedTimeRemainingSec(estimatedSeconds);
       });
 
       logger.info('Processing batch item', {
@@ -372,7 +401,9 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
         }
 
         const resetItem = { ...item, status: 'pending' as QueueItemStatus, error: undefined };
+        remainingPendingCountRef.current = itemsToProcess.length - (index + 1);
         const processedItem = await processItem(resetItem);
+        currentItemStartTimeRef.current = null;
         processedItems.push(processedItem);
         setQueue((prev) => prev.map((q) => (q.id === processedItem.id ? processedItem : q)));
 
@@ -403,6 +434,8 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
       setIsProcessing(false);
       setCurrentItemId(null);
       activeRunItemIdsRef.current = new Set();
+      currentItemStartTimeRef.current = null;
+      remainingPendingCountRef.current = 0;
       setEstimatedTimeRemainingSec(null);
 
       if (!wasCancelled) {
@@ -430,6 +463,8 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
 
     setIsProcessing(false);
     setCurrentItemId(null);
+    currentItemStartTimeRef.current = null;
+    remainingPendingCountRef.current = 0;
     setEstimatedTimeRemainingSec(null);
 
     setQueue((prev) =>

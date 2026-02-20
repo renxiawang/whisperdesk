@@ -545,6 +545,58 @@ describe('useBatchQueue', () => {
       expect(result.current.estimatedTimeRemainingSec).toBeNull();
       nowSpy.mockRestore();
     });
+
+    it('should estimate remaining time from current item progress before first completion', async () => {
+      let now = 1000;
+      const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+      let progressCb: ((progress: TranscriptionProgress) => void) | undefined;
+      let resolveTranscription: ((value: TranscriptionResult) => void) | undefined;
+
+      overrideElectronAPI({
+        startTranscription: vi.fn().mockImplementation(
+          () =>
+            new Promise<TranscriptionResult>((resolve) => {
+              resolveTranscription = resolve;
+            })
+        ),
+        onTranscriptionProgress: (cb) => {
+          progressCb = cb;
+          return () => {};
+        },
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([
+          createMockSelectedFile('audio1.mp3'),
+          createMockSelectedFile('audio2.mp3'),
+          createMockSelectedFile('audio3.mp3'),
+        ]);
+      });
+
+      let processingPromise: Promise<void>;
+      act(() => {
+        processingPromise = result.current.startProcessing();
+      });
+
+      act(() => {
+        now = 2000;
+        progressCb?.({ percent: 50, status: 'Halfway' });
+      });
+
+      expect(result.current.estimatedTimeRemainingSec).toBe(5);
+
+      await act(async () => {
+        now = 3000;
+        resolveTranscription?.({ success: true, text: 'done' });
+        await result.current.cancelProcessing();
+        await processingPromise;
+      });
+
+      nowSpy.mockRestore();
+    });
   });
 
   describe('cancelProcessing', () => {
