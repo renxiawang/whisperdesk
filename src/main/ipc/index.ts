@@ -236,4 +236,26 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     }
     await shell.openExternal(url);
   });
+
+  ipcMain.handle('shell:showItemInFolder', async (_event, filePath: string) => {
+    try {
+      if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+        return { success: false, error: 'Invalid file path' };
+      }
+
+      const resolvedPath = path.resolve(filePath);
+      if (!path.isAbsolute(resolvedPath)) {
+        return { success: false, error: 'Invalid file path' };
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
+        return { success: false, error: 'File not found' };
+      }
+
+      shell.showItemInFolder(resolvedPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
 }

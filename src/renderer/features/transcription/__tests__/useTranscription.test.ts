@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useTranscription } from '@/features/transcription';
 import { overrideElectronAPI } from '@/test/utils';
 import { createMockFile } from '@/test/fixtures';
+import { logger } from '@/services/logger';
 
 describe('useTranscription', () => {
   beforeEach(() => {
@@ -71,8 +72,11 @@ describe('useTranscription', () => {
     const mockSaveFile = vi
       .fn()
       .mockResolvedValue({ success: true, filePath: '/path/to/saved.vtt' });
+    const mockShowItemInFolder = vi.fn().mockResolvedValue({ success: true });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     overrideElectronAPI({
       saveFile: mockSaveFile,
+      showItemInFolder: mockShowItemInFolder,
     });
 
     const { result } = renderHook(() => useTranscription());
@@ -91,7 +95,97 @@ describe('useTranscription', () => {
       content: 'Test transcription',
       format: 'vtt',
     });
+    expect(mockShowItemInFolder).not.toHaveBeenCalled();
     expect(result.current.error).toBeNull();
+    confirmSpy.mockRestore();
+  });
+
+  it('should reveal saved file in Finder when confirmed', async () => {
+    const mockSaveFile = vi
+      .fn()
+      .mockResolvedValue({ success: true, filePath: '/path/to/saved.vtt' });
+    const mockShowItemInFolder = vi.fn().mockResolvedValue({ success: true });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    overrideElectronAPI({
+      saveFile: mockSaveFile,
+      showItemInFolder: mockShowItemInFolder,
+    });
+
+    const { result } = renderHook(() => useTranscription());
+
+    act(() => {
+      result.current.setSelectedFile(mockFile);
+      result.current.setTranscription('Test transcription');
+    });
+
+    await act(async () => {
+      await result.current.handleSave('vtt');
+    });
+
+    expect(mockShowItemInFolder).toHaveBeenCalledWith('/path/to/saved.vtt');
+    confirmSpy.mockRestore();
+  });
+
+  it('should log warning when revealing saved file fails', async () => {
+    const mockSaveFile = vi
+      .fn()
+      .mockResolvedValue({ success: true, filePath: '/path/to/saved.vtt' });
+    const mockShowItemInFolder = vi
+      .fn()
+      .mockResolvedValue({ success: false, error: 'No handler registered' });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    overrideElectronAPI({
+      saveFile: mockSaveFile,
+      showItemInFolder: mockShowItemInFolder,
+    });
+
+    const { result } = renderHook(() => useTranscription());
+
+    act(() => {
+      result.current.setSelectedFile(mockFile);
+      result.current.setTranscription('Test transcription');
+    });
+
+    await act(async () => {
+      await result.current.handleSave('vtt');
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith('Failed to reveal saved file in Finder', {
+      path: 'saved.vtt',
+      error: 'No handler registered',
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('should skip reveal when confirm throws', async () => {
+    const mockSaveFile = vi
+      .fn()
+      .mockResolvedValue({ success: true, filePath: '/path/to/saved.vtt' });
+    const mockShowItemInFolder = vi.fn().mockResolvedValue({ success: true });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('confirm unavailable');
+    });
+
+    overrideElectronAPI({
+      saveFile: mockSaveFile,
+      showItemInFolder: mockShowItemInFolder,
+    });
+
+    const { result } = renderHook(() => useTranscription());
+
+    act(() => {
+      result.current.setSelectedFile(mockFile);
+      result.current.setTranscription('Test transcription');
+    });
+
+    await act(async () => {
+      await result.current.handleSave('vtt');
+    });
+
+    expect(mockShowItemInFolder).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it('should handle save file error', async () => {

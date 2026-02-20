@@ -53,6 +53,7 @@ export interface ElectronAPI {
     properties?: Record<string, string | number | boolean>
   ) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  showItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   onMenuOpenFile: (callback: () => void) => Unsubscribe;
   onMenuSaveFile: (callback: () => void) => Unsubscribe;
   onMenuCopyTranscription: (callback: () => void) => Unsubscribe;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, createEvent } from '@testing-library/react';
 import { FileDropZone } from '@/features/transcription';
 import { overrideElectronAPI } from '@/test/utils';
 import { createMockFile } from '@/test/fixtures';
@@ -98,6 +98,47 @@ describe('FileDropZone', () => {
 
     const dropzone = screen.getByRole('button');
     fireEvent.click(dropzone);
+
+    expect(window.electronAPI?.openMultipleFiles).not.toHaveBeenCalled();
+  });
+
+  it('should prevent default on drag over', () => {
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+
+    const dropzone = screen.getByRole('button');
+    const event = createEvent.dragOver(dropzone);
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+    fireEvent(dropzone, event);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+
+  it('should open file dialog on Enter key', async () => {
+    overrideElectronAPI({
+      openMultipleFiles: vi.fn().mockResolvedValue(['/path/to/test1.mp3']),
+      getFileInfo: vi.fn().mockResolvedValue({
+        name: 'test1.mp3',
+        path: '/path/to/test1.mp3',
+        size: 1024,
+      }),
+    });
+
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+    const dropzone = screen.getByRole('button');
+
+    fireEvent.keyDown(dropzone, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(window.electronAPI?.openMultipleFiles).toHaveBeenCalled();
+      expect(onFilesSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('should ignore non-activation keys', () => {
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+    const dropzone = screen.getByRole('button');
+
+    fireEvent.keyDown(dropzone, { key: 'ArrowDown' });
 
     expect(window.electronAPI?.openMultipleFiles).not.toHaveBeenCalled();
   });

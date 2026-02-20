@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('analytics:track', eventName, properties),
 
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  showItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
 
   onMenuOpenFile: (callback: () => void) => {
     ipcRenderer.on('menu:openFile', () => callback());

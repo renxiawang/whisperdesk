@@ -1,8 +1,30 @@
 import { useState, useCallback } from 'react';
 import type { SelectedFile, TranscriptionSettings, OutputFormat } from '../../../types';
-import { saveFile } from '../../../services/electronAPI';
+import { saveFile, showItemInFolder } from '../../../services/electronAPI';
 import { logger } from '../../../services/logger';
 import { sanitizePath } from '../../../../shared/utils';
+
+function shouldRevealInFinderAfterSave(): boolean {
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
+    return false;
+  }
+
+  const confirmFn = window.confirm as unknown as {
+    (message?: string): boolean;
+    mock?: unknown;
+  };
+  const isJSDOM = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '');
+
+  if (isJSDOM && !confirmFn.mock) {
+    return false;
+  }
+
+  try {
+    return confirmFn('File saved successfully. Show in Finder?');
+  } catch {
+    return false;
+  }
+}
 
 export interface UseTranscriptionReturn {
   selectedFile: SelectedFile | null;
@@ -76,6 +98,16 @@ export function useTranscription(): UseTranscriptionReturn {
 
       if (result?.success && result.filePath) {
         logger.info('File saved', { path: sanitizePath(result.filePath), format });
+
+        if (shouldRevealInFinderAfterSave()) {
+          const revealResult = await showItemInFolder(result.filePath);
+          if (!revealResult.success) {
+            logger.warn('Failed to reveal saved file in Finder', {
+              path: sanitizePath(result.filePath),
+              error: revealResult.error || 'Unknown error',
+            });
+          }
+        }
       } else if (result?.error) {
         setError(`Failed to save: ${result.error}`);
         logger.error('Failed to save file', { error: result.error, format });

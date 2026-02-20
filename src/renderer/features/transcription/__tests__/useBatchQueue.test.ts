@@ -214,6 +214,35 @@ describe('useBatchQueue', () => {
 
       expect(result.current.queue).toHaveLength(0);
     });
+
+    it('should not clear items while processing', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      const pendingPromise = new Promise(() => {});
+
+      overrideElectronAPI({
+        startTranscription: vi.fn().mockReturnValue(pendingPromise),
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      act(() => {
+        result.current.startProcessing();
+      });
+
+      expect(result.current.isProcessing).toBe(true);
+
+      act(() => {
+        result.current.clearAll();
+      });
+
+      expect(result.current.queue).toHaveLength(1);
+      expect(warnSpy).toHaveBeenCalledWith('Cannot clear queue while processing');
+    });
   });
 
   describe('startProcessing', () => {
