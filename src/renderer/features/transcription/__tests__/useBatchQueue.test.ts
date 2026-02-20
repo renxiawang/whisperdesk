@@ -12,6 +12,7 @@ import { logger } from '@/services/logger';
 
 describe('useBatchQueue', () => {
   const originalNotification = globalThis.Notification;
+  const QUEUE_STORAGE_KEY = 'whisperdesk_queue';
 
   const mockSettings: TranscriptionSettings = {
     model: 'base',
@@ -33,6 +34,7 @@ describe('useBatchQueue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     overrideElectronAPI({
       startTranscription: vi.fn().mockResolvedValue({
         success: true,
@@ -87,6 +89,68 @@ describe('useBatchQueue', () => {
       expect(result.current.isProcessing).toBe(false);
       expect(result.current.currentItemId).toBe(null);
       expect(result.current.estimatedTimeRemainingSec).toBeNull();
+      expect(result.current.showQueueResumePrompt).toBe(false);
+      expect(result.current.restoredQueueItemsCount).toBe(0);
+    });
+
+    it('should restore persisted queue and normalize processing items to pending', () => {
+      localStorage.setItem(
+        QUEUE_STORAGE_KEY,
+        JSON.stringify([
+          {
+            id: 'pending-1',
+            file: { name: 'pending.mp3', path: '/path/to/pending.mp3', size: 1024 },
+            status: 'pending',
+          },
+          {
+            id: 'processing-1',
+            file: { name: 'processing.mp3', path: '/path/to/processing.mp3' },
+            status: 'processing',
+          },
+          {
+            id: 'error-1',
+            file: { name: 'error.mp3', path: '/path/to/error.mp3' },
+            status: 'error',
+            error: 'Failed previously',
+          },
+          {
+            id: 'invalid-1',
+            file: { name: 'invalid.mp3', path: '/path/to/invalid.mp3' },
+            status: 'completed',
+          },
+        ])
+      );
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      expect(result.current.queue).toHaveLength(3);
+      expect(result.current.queue[0]).toMatchObject({
+        id: 'pending-1',
+        status: 'pending',
+        progress: { percent: 0, status: '' },
+      });
+      expect(result.current.queue[1]).toMatchObject({
+        id: 'processing-1',
+        status: 'pending',
+        progress: { percent: 0, status: '' },
+      });
+      expect(result.current.queue[2]).toMatchObject({
+        id: 'error-1',
+        status: 'error',
+        error: 'Failed previously',
+      });
+      expect(result.current.showQueueResumePrompt).toBe(true);
+      expect(result.current.restoredQueueItemsCount).toBe(3);
+    });
+
+    it('should ignore corrupted persisted queue data', () => {
+      localStorage.setItem(QUEUE_STORAGE_KEY, 'not-json');
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      expect(result.current.queue).toEqual([]);
+      expect(result.current.showQueueResumePrompt).toBe(false);
+      expect(result.current.restoredQueueItemsCount).toBe(0);
     });
   });
 
@@ -279,6 +343,93 @@ describe('useBatchQueue', () => {
 
       expect(result.current.queue).toHaveLength(1);
       expect(warnSpy).toHaveBeenCalledWith('Cannot clear queue while processing');
+    });
+  });
+
+  describe('queue persistence and resume', () => {
+    it('should persist resumable queue items to localStorage', () => {
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      const saved = JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({
+        file: {
+          name: 'audio1.mp3',
+          path: '/path/to/audio1.mp3',
+        },
+        status: 'pending',
+      });
+    });
+
+    it('should clear persisted queue when all items are completed', async () => {
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      expect(localStorage.getItem(QUEUE_STORAGE_KEY)).not.toBeNull();
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(localStorage.getItem(QUEUE_STORAGE_KEY)).toBeNull();
+    });
+
+    it('should dismiss resume prompt without changing restored queue', () => {
+      localStorage.setItem(
+        QUEUE_STORAGE_KEY,
+        JSON.stringify([
+          {
+            id: 'restored-1',
+            file: { name: 'restored.mp3', path: '/path/to/restored.mp3' },
+            status: 'pending',
+          },
+        ])
+      );
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      expect(result.current.showQueueResumePrompt).toBe(true);
+      expect(result.current.queue).toHaveLength(1);
+
+      act(() => {
+        result.current.dismissQueueResumePrompt();
+      });
+
+      expect(result.current.showQueueResumePrompt).toBe(false);
+      expect(result.current.restoredQueueItemsCount).toBe(0);
+      expect(result.current.queue).toHaveLength(1);
+    });
+
+    it('should resume restored queue and hide resume prompt', async () => {
+      localStorage.setItem(
+        QUEUE_STORAGE_KEY,
+        JSON.stringify([
+          {
+            id: 'restored-1',
+            file: { name: 'restored.mp3', path: '/path/to/restored.mp3' },
+            status: 'pending',
+          },
+        ])
+      );
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      expect(result.current.showQueueResumePrompt).toBe(true);
+
+      await act(async () => {
+        await result.current.resumePersistedQueue();
+      });
+
+      expect(result.current.showQueueResumePrompt).toBe(false);
+      expect(result.current.restoredQueueItemsCount).toBe(0);
+      expect(result.current.queue[0]!.status).toBe('completed');
     });
   });
 

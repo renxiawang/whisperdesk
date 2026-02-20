@@ -32,6 +32,8 @@ export interface TranscriptionStateContextValue {
   modelDownloaded: boolean;
   duplicateFilesSkipped: number;
   estimatedTimeRemainingSec: number | null;
+  showQueueResumePrompt: boolean;
+  restoredQueueItemsCount: number;
   copySuccess: boolean;
   queue: QueueItem[];
   selectedQueueItemId: string | null;
@@ -50,6 +52,8 @@ export interface TranscriptionActionsContextValue {
   removeFromQueue: (id: string) => void;
   clearCompletedFromQueue: () => void;
   selectQueueItem: (id: string) => void;
+  dismissQueueResumePrompt: () => void;
+  resumePersistedQueue: () => Promise<void>;
 }
 
 export interface TranscriptionContextValue

@@ -6,7 +6,7 @@ import { useFFmpegStatus } from '../../../hooks';
 import { TranscriptionActions } from './TranscriptionActions';
 import { ErrorMessage } from './ErrorMessage';
 import { DonationSection } from './DonationSection';
-import { SystemWarning } from '../../ui';
+import { Button, SystemWarning } from '../../ui';
 
 function LeftPanel(): React.JSX.Element {
   const {
@@ -17,12 +17,16 @@ function LeftPanel(): React.JSX.Element {
     queue,
     duplicateFilesSkipped,
     estimatedTimeRemainingSec,
+    showQueueResumePrompt,
+    restoredQueueItemsCount,
     selectedQueueItemId,
     handleFilesSelect,
     removeFromQueue,
     clearCompletedFromQueue,
     handleRetryFailed,
     selectQueueItem,
+    dismissQueueResumePrompt,
+    resumePersistedQueue,
   } = useAppTranscription();
 
   const { isFFmpegAvailable, isChecking, recheckStatus } = useFFmpegStatus();
@@ -42,6 +46,23 @@ function LeftPanel(): React.JSX.Element {
         duplicateFilesSkipped={duplicateFilesSkipped}
         disabled={isTranscribing}
       />
+
+      {showQueueResumePrompt && restoredQueueItemsCount > 0 && (
+        <div className="queue-resume-banner" role="status" aria-live="polite">
+          <p className="queue-resume-banner-title">
+            Restored {restoredQueueItemsCount} queued file
+            {restoredQueueItemsCount === 1 ? '' : 's'} from your last session.
+          </p>
+          <div className="queue-resume-banner-actions">
+            <Button onClick={() => void resumePersistedQueue()} disabled={isTranscribing}>
+              Resume Queue
+            </Button>
+            <Button variant="ghost" onClick={dismissQueueResumePrompt} disabled={isTranscribing}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {queue.length > 0 && (
         <FileQueue

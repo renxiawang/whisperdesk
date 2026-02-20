@@ -12,6 +12,7 @@ import {
   onTranscriptionProgress,
 } from '../../../services/electronAPI';
 import { logger } from '../../../services/logger';
+import { STORAGE_KEYS } from '../../../utils/storage';
 import { sanitizePath } from '../../../../shared/utils';
 
 interface UseBatchQueueOptions {
@@ -26,11 +27,15 @@ interface UseBatchQueueReturn {
   currentItemId: string | null;
   duplicateFilesSkipped: number;
   estimatedTimeRemainingSec: number | null;
+  showQueueResumePrompt: boolean;
+  restoredQueueItemsCount: number;
 
   addFiles: (files: SelectedFile[]) => void;
   removeFile: (id: string) => void;
   clearCompleted: () => void;
   clearAll: () => void;
+  dismissQueueResumePrompt: () => void;
+  resumePersistedQueue: () => Promise<void>;
 
   startProcessing: () => Promise<void>;
   retryFailed: () => Promise<void>;
@@ -48,6 +53,124 @@ function getFileIdentityKey(file: SelectedFile): string {
     return `fingerprint:${file.fingerprint}`;
   }
   return `path:${file.path}`;
+}
+
+type PersistedQueueStatus = Extract<
+  QueueItemStatus,
+  'pending' | 'processing' | 'error' | 'cancelled'
+>;
+
+interface PersistedQueueItem {
+  id: string;
+  file: SelectedFile;
+  status: PersistedQueueStatus;
+  error?: string;
+}
+
+const QUEUE_STORAGE_KEY = STORAGE_KEYS.QUEUE;
+
+function isPersistedQueueStatus(status: unknown): status is PersistedQueueStatus {
+  return (
+    status === 'pending' || status === 'processing' || status === 'error' || status === 'cancelled'
+  );
+}
+
+function toQueueItem(item: PersistedQueueItem): QueueItem {
+  const status: QueueItemStatus = item.status === 'processing' ? 'pending' : item.status;
+  return {
+    id: item.id,
+    file: item.file,
+    status,
+    progress: { percent: 0, status: '' },
+    error: status === 'error' ? item.error : undefined,
+  };
+}
+
+function loadPersistedQueue(): QueueItem[] {
+  try {
+    const savedQueue = localStorage.getItem(QUEUE_STORAGE_KEY);
+    if (!savedQueue) {
+      return [];
+    }
+
+    const parsedQueue: unknown = JSON.parse(savedQueue);
+    if (!Array.isArray(parsedQueue)) {
+      return [];
+    }
+
+    return parsedQueue.reduce<QueueItem[]>((items, rawItem) => {
+      if (!rawItem || typeof rawItem !== 'object') {
+        return items;
+      }
+
+      const candidate = rawItem as Partial<PersistedQueueItem>;
+      if (typeof candidate.id !== 'string' || !isPersistedQueueStatus(candidate.status)) {
+        return items;
+      }
+
+      const file = candidate.file;
+      if (
+        !file ||
+        typeof file !== 'object' ||
+        typeof file.name !== 'string' ||
+        typeof file.path !== 'string'
+      ) {
+        return items;
+      }
+
+      const normalizedFile: SelectedFile = {
+        name: file.name,
+        path: file.path,
+        size: typeof file.size === 'number' ? file.size : undefined,
+        fingerprint: typeof file.fingerprint === 'string' ? file.fingerprint : undefined,
+      };
+
+      items.push(
+        toQueueItem({
+          id: candidate.id,
+          file: normalizedFile,
+          status: candidate.status,
+          error: typeof candidate.error === 'string' ? candidate.error : undefined,
+        })
+      );
+      return items;
+    }, []);
+  } catch {
+    return [];
+  }
+}
+
+function persistQueue(queue: QueueItem[]): void {
+  const resumableItems: PersistedQueueItem[] = queue.reduce<PersistedQueueItem[]>((items, item) => {
+    if (item.status === 'completed') {
+      return items;
+    }
+
+    items.push({
+      id: item.id,
+      file: {
+        name: item.file.name,
+        path: item.file.path,
+        size: item.file.size,
+        fingerprint: item.file.fingerprint,
+      },
+      status: item.status,
+      error: item.status === 'error' ? item.error : undefined,
+    });
+
+    return items;
+  }, []);
+
+  try {
+    if (resumableItems.length === 0) {
+      localStorage.removeItem(QUEUE_STORAGE_KEY);
+      return;
+    }
+
+    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(resumableItems));
+  } catch (error) {
+    logger.error('Failed to persist batch queue:', error);
+  }
 }
 
 function showBatchCompletionNotification(items: QueueItem[]): void {
@@ -103,11 +226,13 @@ function showBatchCompletionNotification(items: QueueItem[]): void {
 export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueReturn {
   const { settings, onHistoryAdd, onFirstComplete } = options;
 
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>(() => loadPersistedQueue());
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
   const [duplicateFilesSkipped, setDuplicateFilesSkipped] = useState(0);
   const [estimatedTimeRemainingSec, setEstimatedTimeRemainingSec] = useState<number | null>(null);
+  const [showQueueResumePrompt, setShowQueueResumePrompt] = useState(false);
+  const [restoredQueueItemsCount, setRestoredQueueItemsCount] = useState(0);
 
   const isCancelledRef = useRef(false);
   const hasCalledFirstCompleteRef = useRef(false);
@@ -118,8 +243,24 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   const remainingPendingCountRef = useRef(0);
 
   useEffect(() => {
+    const restoredCount = queue.length;
+    if (restoredCount > 0) {
+      setShowQueueResumePrompt(true);
+      setRestoredQueueItemsCount(restoredCount);
+    }
+  }, []);
+
+  useEffect(() => {
     queueRef.current = queue;
+    persistQueue(queue);
   }, [queue]);
+
+  useEffect(() => {
+    if (queue.length === 0) {
+      setShowQueueResumePrompt(false);
+      setRestoredQueueItemsCount(0);
+    }
+  }, [queue.length]);
 
   useEffect(() => {
     return () => {
@@ -188,8 +329,15 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
       return;
     }
     setQueue([]);
+    setShowQueueResumePrompt(false);
+    setRestoredQueueItemsCount(0);
     logger.info('Cleared all items from batch queue');
   }, [isProcessing]);
+
+  const dismissQueueResumePrompt = useCallback(() => {
+    setShowQueueResumePrompt(false);
+    setRestoredQueueItemsCount(0);
+  }, []);
 
   const processItem = useCallback(
     async (item: QueueItem): Promise<QueueItem> => {
@@ -448,12 +596,18 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
   );
 
   const startProcessing = useCallback(async () => {
+    dismissQueueResumePrompt();
     await runProcessing(['pending', 'cancelled', 'error'], 'No items to process');
-  }, [runProcessing]);
+  }, [dismissQueueResumePrompt, runProcessing]);
 
   const retryFailed = useCallback(async () => {
+    dismissQueueResumePrompt();
     await runProcessing(['cancelled', 'error'], 'No failed items to retry');
-  }, [runProcessing]);
+  }, [dismissQueueResumePrompt, runProcessing]);
+
+  const resumePersistedQueue = useCallback(async () => {
+    await startProcessing();
+  }, [startProcessing]);
 
   const cancelProcessing = useCallback(async () => {
     if (!isProcessing) return;
@@ -501,11 +655,15 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     currentItemId,
     duplicateFilesSkipped,
     estimatedTimeRemainingSec,
+    showQueueResumePrompt,
+    restoredQueueItemsCount,
 
     addFiles,
     removeFile,
     clearCompleted,
     clearAll,
+    dismissQueueResumePrompt,
+    resumePersistedQueue,
 
     startProcessing,
     retryFailed,
