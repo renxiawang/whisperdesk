@@ -23,7 +23,7 @@ A beautiful, native macOS desktop application for transcribing audio and video f
 - **Retry Failed Items** - One-click retry for failed or cancelled queue items
 - **Live Batch ETA** - See estimated remaining time while batch processing is running
 - **Completion Notifications** - Native notification when a batch finishes
-- **Multiple Formats** - Supports MP3, WAV, M4A, FLAC, OGG, WMA, AAC, AIFF, MP4, MOV, AVI, MKV, WebM, WMV, FLV, M4V
+- **Multiple Formats** - Supports MP3, WAV, M4A, FLAC, OGG, OPUS, OGA, AMR, WMA, AAC, AIFF, MP4, MOV, AVI, MKV, WebM, WMV, FLV, M4V
 - **Multiple Models** - Choose from tiny, base, small, medium, large-v3, or large-v3-turbo Whisper models (including English-only variants)
 - **Output Formats** - Export as VTT subtitles, SRT subtitles, plain text, Word (`.docx`), PDF, or Markdown
 - **Finder Reveal After Save** - Prompt to reveal the saved transcript directly in Finder

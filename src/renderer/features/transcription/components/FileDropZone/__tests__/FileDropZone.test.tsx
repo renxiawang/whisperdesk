@@ -16,6 +16,7 @@ describe('FileDropZone', () => {
 
     expect(screen.getByText(/Drop audio\/video files here/i)).toBeInTheDocument();
     expect(screen.getByText(/multiple files/i)).toBeInTheDocument();
+    expect(screen.getByText(/OPUS/i)).toBeInTheDocument();
   });
 
   it('should be clickable and open multiple files dialog', async () => {
@@ -70,6 +71,37 @@ describe('FileDropZone', () => {
         expect.objectContaining({
           name: 'test.mp3',
           path: '/path/to/test.mp3',
+        }),
+      ]);
+    });
+  });
+
+  it('should accept .opus files on drop', async () => {
+    overrideElectronAPI({
+      getPathForFile: vi.fn().mockReturnValue('/path/to/voice-note.opus'),
+      getFileInfo: vi.fn().mockResolvedValue({
+        name: 'voice-note.opus',
+        path: '/path/to/voice-note.opus',
+        size: 1024,
+      }),
+    });
+
+    render(<FileDropZone onFilesSelect={onFilesSelect} disabled={false} />);
+
+    const dropzone = screen.getByRole('button');
+    const file = createMockFile({ name: 'voice-note.opus' });
+
+    fireEvent.drop(dropzone, {
+      dataTransfer: {
+        files: [file],
+      },
+    });
+
+    await waitFor(() => {
+      expect(onFilesSelect).toHaveBeenCalledWith([
+        expect.objectContaining({
+          name: 'voice-note.opus',
+          path: '/path/to/voice-note.opus',
         }),
       ]);
     });

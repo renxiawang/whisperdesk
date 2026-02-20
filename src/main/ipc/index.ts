@@ -18,7 +18,10 @@ import {
 } from '../utils/export-helper';
 import { generateFileFingerprint } from '../utils/media-info';
 import { trackEvent, AnalyticsEvents } from '../services/analytics';
+import { SUPPORTED_EXTENSIONS } from '../../shared/types';
 import type { TranscriptionOptions, SaveFileOptions } from '../../shared/types';
+
+const OPEN_DIALOG_MEDIA_EXTENSIONS = [...SUPPORTED_EXTENSIONS];
 
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('dialog:openFile', async () => {
@@ -30,7 +33,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       filters: [
         {
           name: 'Audio/Video',
-          extensions: ['mp3', 'wav', 'm4a', 'mp4', 'mov', 'mkv', 'flac', 'ogg', 'webm'],
+          extensions: OPEN_DIALOG_MEDIA_EXTENSIONS,
         },
       ],
     });
@@ -49,7 +52,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       filters: [
         {
           name: 'Audio/Video',
-          extensions: ['mp3', 'wav', 'm4a', 'mp4', 'mov', 'mkv', 'flac', 'ogg', 'webm'],
+          extensions: OPEN_DIALOG_MEDIA_EXTENSIONS,
         },
       ],
     });

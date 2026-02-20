@@ -80,7 +80,9 @@ function FileDropZone({
         <Files size={40} className="dropzone-icon-svg" />
         <span className="dropzone-text">Drop audio/video files here</span>
         <span className="dropzone-subtext">or click to browse (multiple files)</span>
-        <span className="dropzone-formats">MP3, WAV, M4A, FLAC, OGG, MP4, MOV, AVI, MKV, WEBM</span>
+        <span className="dropzone-formats">
+          MP3, WAV, M4A, FLAC, OGG, OPUS, OGA, AMR, MP4, MOV, AVI, MKV, WEBM
+        </span>
         {queueCount > 0 && (
           <span className="dropzone-queue-badge">{queueCount} files in queue</span>
         )}

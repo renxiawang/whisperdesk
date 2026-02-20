@@ -385,6 +385,7 @@ function convertToWav(inputPath: string, outputPath: string): Promise<string> {
     const args = [
       '-i',
       inputPath,
+      '-vn', // Drop video streams if present
       '-ar',
       '16000', // 16kHz sample rate (required by Whisper)
       '-ac',

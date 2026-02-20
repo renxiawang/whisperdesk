@@ -16,6 +16,9 @@ describe('config/constants', () => {
       expect(SUPPORTED_EXTENSIONS).toContain('mp3');
       expect(SUPPORTED_EXTENSIONS).toContain('wav');
       expect(SUPPORTED_EXTENSIONS).toContain('flac');
+      expect(SUPPORTED_EXTENSIONS).toContain('opus');
+      expect(SUPPORTED_EXTENSIONS).toContain('oga');
+      expect(SUPPORTED_EXTENSIONS).toContain('amr');
     });
 
     it('includes video extensions', () => {
