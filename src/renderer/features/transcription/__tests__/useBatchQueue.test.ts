@@ -672,6 +672,31 @@ describe('useBatchQueue', () => {
       expect(result.current.queue[0]!.error).toBe('Transcription failed');
     });
 
+    it('should map FFmpeg no-audio errors to a friendly message', async () => {
+      overrideElectronAPI({
+        startTranscription: vi.fn().mockResolvedValue({
+          success: false,
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+        onTranscriptionProgress: vi.fn().mockReturnValue(() => {}),
+      });
+
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('video-only.mov')]);
+      });
+
+      await act(async () => {
+        await result.current.startProcessing();
+      });
+
+      expect(result.current.queue[0]!.status).toBe('error');
+      expect(result.current.queue[0]!.error).toBe(
+        'No audio track found in this file. Please choose a file that contains audio.'
+      );
+    });
+
     it('should handle cancelled result from transcription', async () => {
       overrideElectronAPI({
         startTranscription: vi.fn().mockResolvedValue({

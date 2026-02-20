@@ -64,18 +64,16 @@ function LeftPanel(): React.JSX.Element {
         </div>
       )}
 
-      {queue.length > 0 && (
-        <FileQueue
-          queue={queue}
-          onRemove={removeFromQueue}
-          onClearCompleted={clearCompletedFromQueue}
-          onRetryFailed={handleRetryFailed}
-          onSelectItem={selectQueueItem}
-          selectedItemId={selectedQueueItemId}
-          estimatedTimeRemainingSec={estimatedTimeRemainingSec}
-          disabled={isTranscribing}
-        />
-      )}
+      <FileQueue
+        queue={queue}
+        onRemove={removeFromQueue}
+        onClearCompleted={clearCompletedFromQueue}
+        onRetryFailed={handleRetryFailed}
+        onSelectItem={selectQueueItem}
+        selectedItemId={selectedQueueItemId}
+        estimatedTimeRemainingSec={estimatedTimeRemainingSec}
+        disabled={isTranscribing}
+      />
 
       <SettingsPanel
         settings={settings}

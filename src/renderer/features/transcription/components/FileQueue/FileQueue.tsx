@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle, Loader, Clock, XCircle, Slash, X, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '../../../../components/ui';
 import { formatFileSize } from '../../../../utils';
 import type { QueueItem, QueueItemStatus } from '../../../../types';
+import { toUserFriendlyTranscriptionError } from '../../utils/errorMessages';
 import './FileQueue.css';
 
 export interface FileQueueProps {
@@ -15,6 +16,8 @@ export interface FileQueueProps {
   estimatedTimeRemainingSec?: number | null;
   disabled?: boolean;
 }
+
+const REMOVE_ERROR_TOAST_DURATION_MS = 5000;
 
 function getStatusIcon(status: QueueItemStatus): React.ReactNode {
   switch (status) {
@@ -60,8 +63,43 @@ function FileQueue({
   estimatedTimeRemainingSec = null,
   disabled = false,
 }: FileQueueProps): React.JSX.Element | null {
-  if (queue.length === 0) {
+  const [removeErrorToastMessage, setRemoveErrorToastMessage] = useState<string | null>(null);
+  const removeErrorToastTimeoutRef = useRef<number | null>(null);
+
+  const clearRemoveErrorToastTimer = useCallback(() => {
+    if (removeErrorToastTimeoutRef.current === null) {
+      return;
+    }
+    window.clearTimeout(removeErrorToastTimeoutRef.current);
+    removeErrorToastTimeoutRef.current = null;
+  }, []);
+
+  const showRemoveErrorToast = useCallback(
+    (message: string) => {
+      clearRemoveErrorToastTimer();
+      setRemoveErrorToastMessage(message);
+      removeErrorToastTimeoutRef.current = window.setTimeout(() => {
+        setRemoveErrorToastMessage(null);
+        removeErrorToastTimeoutRef.current = null;
+      }, REMOVE_ERROR_TOAST_DURATION_MS);
+    },
+    [clearRemoveErrorToastTimer]
+  );
+
+  useEffect(() => clearRemoveErrorToastTimer, [clearRemoveErrorToastTimer]);
+
+  if (queue.length === 0 && !removeErrorToastMessage) {
     return null;
+  }
+
+  if (queue.length === 0) {
+    return (
+      <div className="file-queue file-queue-toast-only">
+        <div className="file-queue-toast" role="status" aria-live="polite">
+          {removeErrorToastMessage}
+        </div>
+      </div>
+    );
   }
 
   const completedCount = queue.filter((item) => item.status === 'completed').length;
@@ -77,10 +115,16 @@ function FileQueue({
     onSelectItem?.(id);
   };
 
-  const handleRemoveClick = (e: React.MouseEvent, id: string, isProcessing: boolean): void => {
+  const handleRemoveClick = (e: React.MouseEvent, item: QueueItem): void => {
     e.stopPropagation();
-    if (disabled || isProcessing) return;
-    onRemove(id);
+    if (disabled || item.status === 'processing') return;
+
+    if (item.status === 'error' && item.error) {
+      const friendlyError = toUserFriendlyTranscriptionError(item.error);
+      showRemoveErrorToast(`Removed failed item: ${friendlyError}`);
+    }
+
+    onRemove(item.id);
   };
 
   return (
@@ -142,7 +186,12 @@ function FileQueue({
                 </div>
               )}
               {item.status === 'error' && item.error && (
-                <span className="file-queue-item-error">{item.error}</span>
+                <span
+                  className="file-queue-item-error"
+                  title={toUserFriendlyTranscriptionError(item.error)}
+                >
+                  {toUserFriendlyTranscriptionError(item.error)}
+                </span>
               )}
             </div>
             <div className="file-queue-item-meta">
@@ -158,7 +207,7 @@ function FileQueue({
               size="sm"
               icon={<X size={14} />}
               iconOnly
-              onClick={(e) => handleRemoveClick(e, item.id, item.status === 'processing')}
+              onClick={(e) => handleRemoveClick(e, item)}
               disabled={disabled || item.status === 'processing'}
               title="Remove from queue"
               aria-label={`Remove ${item.file.name} from queue`}
@@ -167,6 +216,12 @@ function FileQueue({
           </div>
         ))}
       </div>
+
+      {removeErrorToastMessage && (
+        <div className="file-queue-toast" role="status" aria-live="polite">
+          {removeErrorToastMessage}
+        </div>
+      )}
 
       <div className="file-queue-summary">
         {completedCount > 0 && <span>{completedCount} completed</span>}

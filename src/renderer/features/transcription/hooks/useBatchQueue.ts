@@ -14,6 +14,7 @@ import {
 import { logger } from '../../../services/logger';
 import { STORAGE_KEYS } from '../../../utils/storage';
 import { sanitizePath } from '../../../../shared/utils';
+import { toUserFriendlyTranscriptionError } from '../utils/errorMessages';
 
 interface UseBatchQueueOptions {
   settings: TranscriptionSettings;
@@ -82,7 +83,8 @@ function toQueueItem(item: PersistedQueueItem): QueueItem {
     file: item.file,
     status,
     progress: { percent: 0, status: '' },
-    error: status === 'error' ? item.error : undefined,
+    error:
+      status === 'error' && item.error ? toUserFriendlyTranscriptionError(item.error) : undefined,
   };
 }
 
@@ -446,7 +448,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
             ...item,
             startTime,
             status: 'error',
-            error,
+            error: toUserFriendlyTranscriptionError(error),
             endTime,
           };
         }
@@ -510,7 +512,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
           ...item,
           startTime,
           status: 'error',
-          error,
+          error: toUserFriendlyTranscriptionError(error),
           endTime: Date.now(),
         };
       } finally {

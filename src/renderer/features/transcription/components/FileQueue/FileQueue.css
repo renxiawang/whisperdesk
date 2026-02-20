@@ -178,6 +178,22 @@
   opacity: 1;
 }
 
+.file-queue-toast {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--warning, #b45309);
+  background: var(--warning-light, rgba(245, 158, 11, 0.12));
+  color: var(--warning, #b45309);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.file-queue.file-queue-toast-only {
+  background: transparent;
+  border: none;
+}
+
 .file-queue-summary {
   display: flex;
   gap: 12px;

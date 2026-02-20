@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import { FileQueue } from '../FileQueue';
 import type { QueueItem } from '@/types';
 
@@ -114,6 +115,39 @@ describe('FileQueue', () => {
       render(<FileQueue {...defaultProps} queue={queue} />);
       expect(screen.getByText('Transcription failed')).toBeInTheDocument();
     });
+
+    it('should display a friendly message for FFmpeg files without audio tracks', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+      expect(
+        screen.getByText(
+          'No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('should expose full error text on hover tooltip', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} />);
+
+      const error = screen.getByText(
+        'No audio track found in this file. Please choose a file that contains audio.'
+      );
+      expect(error).toHaveAttribute(
+        'title',
+        'No audio track found in this file. Please choose a file that contains audio.'
+      );
+    });
   });
 
   describe('interactions', () => {
@@ -132,6 +166,62 @@ describe('FileQueue', () => {
       const removeButton = screen.getByLabelText('Remove audio.mp3 from queue');
       fireEvent.click(removeButton);
       expect(onRemove).toHaveBeenCalledWith('item-1');
+    });
+
+    it('should show a toast with friendly error when removing a failed item', () => {
+      const onRemove = vi.fn();
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+      render(<FileQueue {...defaultProps} queue={queue} onRemove={onRemove} />);
+
+      const removeButton = screen.getByLabelText('Remove audio.mp3 from queue');
+      fireEvent.click(removeButton);
+
+      expect(onRemove).toHaveBeenCalledWith('item-1');
+      expect(
+        screen.getByText(
+          'Removed failed item: No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('should keep toast visible when removing the only failed item', () => {
+      const queue = [
+        createMockQueueItem({
+          status: 'error',
+          error: 'FFmpeg conversion failed: Output file does not contain any stream',
+        }),
+      ];
+
+      const Wrapper = () => {
+        const [items, setItems] = useState(queue);
+
+        return (
+          <FileQueue
+            queue={items}
+            onRemove={(id) => setItems((prev) => prev.filter((item) => item.id !== id))}
+            onClearCompleted={vi.fn()}
+            onRetryFailed={vi.fn()}
+            onSelectItem={vi.fn()}
+            selectedItemId={null}
+          />
+        );
+      };
+
+      render(<Wrapper />);
+
+      fireEvent.click(screen.getByLabelText('Remove audio.mp3 from queue'));
+
+      expect(
+        screen.getByText(
+          'Removed failed item: No audio track found in this file. Please choose a file that contains audio.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('FILES (1)')).not.toBeInTheDocument();
     });
 
     it('should not call onRemove when disabled', () => {
