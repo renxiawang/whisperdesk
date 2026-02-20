@@ -259,6 +259,7 @@ export function useBatchQueue(options: UseBatchQueueOptions): UseBatchQueueRetur
     if (queue.length === 0) {
       setShowQueueResumePrompt(false);
       setRestoredQueueItemsCount(0);
+      setDuplicateFilesSkipped(0);
     }
   }, [queue.length]);
 

@@ -274,6 +274,31 @@ describe('useBatchQueue', () => {
       expect(result.current.queue).toHaveLength(1);
       expect(result.current.queue[0]!.file.name).toBe('audio2.mp3');
     });
+
+    it('should clear duplicate skipped badge count when queue becomes empty', async () => {
+      const { result } = renderHook(() => useBatchQueue({ settings: mockSettings }));
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      act(() => {
+        result.current.addFiles([createMockSelectedFile('audio1.mp3')]);
+      });
+
+      expect(result.current.duplicateFilesSkipped).toBe(1);
+
+      const idToRemove = result.current.queue[0]!.id;
+      act(() => {
+        result.current.removeFile(idToRemove);
+      });
+
+      expect(result.current.queue).toHaveLength(0);
+
+      await waitFor(() => {
+        expect(result.current.duplicateFilesSkipped).toBe(0);
+      });
+    });
   });
 
   describe('clearCompleted', () => {
