@@ -1,3 +1,5 @@
+> **Fork note:** This fork adds support for live transcription and real-time translation, vibe coded for personal use only.
+
 # 🎙️ WhisperDesk
 
 [![Downloads](https://img.shields.io/github/downloads/PVAS-Development/whisperdesk/total.svg)](https://github.com/PVAS-Development/whisperdesk/releases)
@@ -34,6 +36,7 @@ A beautiful, native macOS desktop application for transcribing audio and video f
 - **Keyboard Shortcuts** - Full keyboard navigation support
 - **Transcription History + Search** - Keep track of recent transcriptions and search by file name, content, model, or language
 - **Native Performance** - Uses whisper.cpp for fast, efficient transcription
+- **Live system audio (planned)** - Transcribe Zoom/Meet/system audio in real time; see [docs/LIVE_SYSTEM_AUDIO.md](docs/LIVE_SYSTEM_AUDIO.md) for the exploration and implementation plan
 - **TypeScript** - Fully typed codebase for better maintainability
 - **Feature-Driven Architecture** - Modular codebase organized by feature domains
 
