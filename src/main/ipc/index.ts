@@ -19,8 +19,22 @@ import {
 import { generateFileFingerprint } from '../utils/media-info';
 import { safeSend } from '../utils/safe-send';
 import { trackEvent, AnalyticsEvents } from '../services/analytics';
+import {
+  startLiveCapture,
+  stopLiveCapture,
+  getLiveCaptureStatus,
+  onLiveCaptureEvent,
+} from '../services/live-capture';
+import {
+  startAppleLiveCapture,
+  stopAppleLiveCapture,
+  getAppleLiveCaptureStatus,
+  onAppleLiveCaptureEvent,
+} from '../services/live-capture-apple';
+import { setTranslationBackend, getTranslationBackend } from '../services/translation';
+import type { TranslationBackend } from '../services/translation';
 import { SUPPORTED_EXTENSIONS } from '../../shared/types';
-import type { TranscriptionOptions, SaveFileOptions } from '../../shared/types';
+import type { TranscriptionOptions, SaveFileOptions, LiveCaptureOptions } from '../../shared/types';
 
 const OPEN_DIALOG_MEDIA_EXTENSIONS = [...SUPPORTED_EXTENSIONS];
 
@@ -240,6 +254,96 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     }
     await shell.openExternal(url);
   });
+
+  // -----------------------------------------------------------------------
+  // Live system audio capture
+  // -----------------------------------------------------------------------
+
+  // Track which engine started the current session so stop() uses the right one
+  let activeTranscriptionEngine: 'whisper' | 'apple' = 'whisper';
+
+  // Whisper engine events
+  onLiveCaptureEvent((event) => {
+    if (activeTranscriptionEngine !== 'whisper') return;
+    const win = getMainWindow();
+    if (!win) return;
+
+    if (event.type === 'status') {
+      safeSend(win, 'live:status', event.status);
+    } else if (event.type === 'chunk') {
+      safeSend(win, 'live:chunk', event.payload);
+    } else if (event.type === 'translation') {
+      safeSend(win, 'live:translation', { index: event.index, translation: event.translation });
+    } else if (event.type === 'error') {
+      safeSend(win, 'live:error', event.error);
+    }
+  });
+
+  // Apple Speech engine events
+  onAppleLiveCaptureEvent((event) => {
+    if (activeTranscriptionEngine !== 'apple') return;
+    const win = getMainWindow();
+    if (!win) return;
+
+    if (event.type === 'status') {
+      safeSend(win, 'live:status', event.status);
+    } else if (event.type === 'partial') {
+      safeSend(win, 'live:partial', event.text);
+    } else if (event.type === 'partialTranslation') {
+      safeSend(win, 'live:partial-translation', event.translation);
+    } else if (event.type === 'chunk') {
+      safeSend(win, 'live:chunk', event.payload);
+    } else if (event.type === 'translation') {
+      safeSend(win, 'live:translation', { index: event.index, translation: event.translation });
+    } else if (event.type === 'error') {
+      safeSend(win, 'live:error', event.error);
+    }
+  });
+
+  ipcMain.handle('live:start', async (_event, options: LiveCaptureOptions) => {
+    try {
+      activeTranscriptionEngine = options.transcriptionEngine === 'apple' ? 'apple' : 'whisper';
+      if (activeTranscriptionEngine === 'apple') {
+        await startAppleLiveCapture(options);
+      } else {
+        await startLiveCapture(options);
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('live:stop', async () => {
+    try {
+      if (activeTranscriptionEngine === 'apple') {
+        await stopAppleLiveCapture();
+      } else {
+        await stopLiveCapture();
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('live:status', () => {
+    if (activeTranscriptionEngine === 'apple') {
+      return getAppleLiveCaptureStatus();
+    }
+    return getLiveCaptureStatus();
+  });
+
+  ipcMain.handle('translation:setBackend', (_event, backend: TranslationBackend) => {
+    setTranslationBackend(backend);
+    return { success: true };
+  });
+
+  ipcMain.handle('translation:getBackend', () => {
+    return getTranslationBackend();
+  });
+
+  // -----------------------------------------------------------------------
 
   ipcMain.handle('shell:showItemInFolder', async (_event, filePath: string) => {
     try {

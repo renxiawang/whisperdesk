@@ -71,6 +71,48 @@
   border-color: var(--border-hover);
 }
 
+/* Mode toggle (Files / Live) */
+
+.mode-toggle {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-left: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.mode-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.mode-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.mode-toggle-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.mode-toggle-btn--active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .app-main {
   flex: 1;
   display: grid;
@@ -78,6 +120,10 @@
   gap: 0;
   overflow: hidden;
   min-height: 0;
+}
+
+.app-main--live {
+  grid-template-columns: 1fr;
 }
 
 .left-panel {

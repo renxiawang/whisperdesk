@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     main: 'src/main/index.ts',
     preload: 'src/preload/index.ts',
+    'translation-worker': 'src/main/services/translation-worker.ts',
   },
   outDir: 'dist-electron',
   format: ['cjs'],

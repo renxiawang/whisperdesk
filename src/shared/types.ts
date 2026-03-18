@@ -229,3 +229,60 @@ export interface UpdateStatus {
   progress?: UpdateProgress;
   error?: string;
 }
+
+// --- Live system audio transcription (macOS 13+, ScreenCaptureKit) ---
+
+export interface LiveCaptureOptions {
+  model: WhisperModelName;
+  language: LanguageCode;
+  /** Duration of each audio chunk in seconds (default 10). */
+  chunkDurationSeconds?: number;
+  /** Seconds of overlap between consecutive chunks to avoid cutting words (default 2). */
+  overlapSeconds?: number;
+  /**
+   * Transcription engine to use.
+   * - 'whisper' (default) — whisper.cpp CLI, high accuracy, chunked.
+   * - 'apple'             — macOS SFSpeechRecognizer, streaming, low latency.
+   */
+  transcriptionEngine?: 'whisper' | 'apple';
+}
+
+export interface LiveTranscriptChunk {
+  text: string;
+  /** Approximate start time of chunk since capture started (seconds). */
+  startTimeSec: number;
+  index: number;
+  /** Populated once translation finishes. */
+  translation?: string;
+}
+
+export type LiveCaptureStatus = 'idle' | 'capturing' | 'transcribing' | 'stopping' | 'error';
+
+export interface LiveCaptureState {
+  status: LiveCaptureStatus;
+  /** Full transcript accumulated so far. */
+  transcript: string;
+  /** Individual chunks in order. */
+  chunks: LiveTranscriptChunk[];
+  /** Error message, if any. */
+  error?: string;
+  /** Seconds elapsed since capture started. */
+  elapsedSec: number;
+}
+
+// --- Future: Translation pipeline types ---
+
+export interface TranslationOptions {
+  sourceLanguage: LanguageCode;
+  targetLanguage: LanguageCode;
+  /** Path or name of the translation model (e.g. 'qwen2.5-7b-q4'). */
+  model?: string;
+}
+
+export interface TranslatedChunk {
+  originalText: string;
+  translatedText: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  index: number;
+}

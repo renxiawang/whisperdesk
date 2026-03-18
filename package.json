@@ -28,11 +28,16 @@
     "electron:dev": "concurrently -k \"vite\" \"npm run build:main -- --watch\" \"wait-on http://localhost:5173 && wait-on dist-electron/main.cjs && electron dist-electron/main.cjs\"",
     "electron:build": "npm run setup:whisper:universal && npm run icons && npm run build && electron-builder",
     "electron:build:mac": "npm run setup:whisper:universal && npm run icons && npm run build && electron-builder --mac",
+    "electron:build:mac:arm64": "npm run setup:whisper && npm run icons && npm run build && electron-builder --mac --config build/electron-builder-arm64.json",
     "electron:build:dir": "npm run setup:whisper:universal && npm run icons && npm run build && electron-builder --dir",
     "icons": "npx tsx scripts/generate-icons.ts",
     "preview": "vite preview",
     "setup:whisper": "bash scripts/setup-whisper-cpp.sh",
     "setup:whisper:universal": "bash scripts/setup-whisper-cpp.sh --universal",
+    "build:audio-capture": "bash scripts/build-audio-capture.sh",
+    "build:audio-capture:universal": "bash scripts/build-audio-capture.sh --universal",
+    "build:translator": "bash scripts/build-translator.sh",
+    "build:speech-capture": "bash scripts/build-speech-capture.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
@@ -66,6 +71,7 @@
   ],
   "dependencies": {
     "@aptabase/electron": "^0.3.1",
+    "@xenova/transformers": "^2.17.2",
     "docx": "^8.5.0",
     "dompurify": "^3.3.0",
     "electron-log": "^5.4.3",
@@ -127,13 +133,23 @@
       "bin/**/*",
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-      "!**/node_modules/.bin"
+      "!**/node_modules/.bin",
+      "!node_modules/onnxruntime-node/**",
+      "!node_modules/@xenova/transformers/node_modules/sharp/**",
+      "!node_modules/@xenova/transformers/node_modules/@img/**",
+      "!node_modules/@img/**"
     ],
     "asarUnpack": [
-      "bin/**/*"
+      "bin/**/*",
+      "node_modules/@xenova/transformers/dist/*.wasm",
+      "node_modules/onnxruntime-web/dist/*.wasm"
     ],
     "mac": {
+      "singleArchFiles": "**/*.node",
       "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSSpeechRecognitionUsageDescription": "WhisperDesk uses on-device speech recognition to transcribe system audio in real time."
+      },
       "target": [
         {
           "target": "dmg",

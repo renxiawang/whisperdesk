@@ -12,6 +12,9 @@ import type {
   MemoryUsage,
   Unsubscribe,
   UpdateStatus,
+  LiveCaptureOptions,
+  LiveTranscriptChunk,
+  LiveCaptureStatus,
 } from './index';
 
 export interface ModelsListResponse {
@@ -60,6 +63,24 @@ export interface ElectronAPI {
   onMenuStartTranscription: (callback: () => void) => Unsubscribe;
   onMenuCancelTranscription: (callback: () => void) => Unsubscribe;
   onMenuToggleHistory: (callback: () => void) => Unsubscribe;
+  // Live system audio capture
+  startLiveCapture: (options: LiveCaptureOptions) => Promise<{ success: boolean; error?: string }>;
+  stopLiveCapture: () => Promise<{ success: boolean; error?: string }>;
+  getLiveCaptureStatus: () => Promise<LiveCaptureStatus>;
+  onLiveChunk: (callback: (chunk: LiveTranscriptChunk) => void) => Unsubscribe;
+  onLiveStatus: (callback: (status: LiveCaptureStatus) => void) => Unsubscribe;
+  onLiveError: (callback: (error: string) => void) => Unsubscribe;
+  onLiveTranslation: (
+    callback: (data: { index: number; translation: string }) => void
+  ) => Unsubscribe;
+
+  onLivePartial: (callback: (text: string) => void) => Unsubscribe;
+  onLivePartialTranslation: (callback: (translation: string) => void) => Unsubscribe;
+
+  // Translation backend
+  setTranslationBackend: (backend: 'xenova' | 'apple') => Promise<{ success: boolean }>;
+  getTranslationBackend: () => Promise<'xenova' | 'apple'>;
+
   checkForUpdates: () => Promise<{ success: boolean; error?: string }>;
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
   installUpdate: () => void;

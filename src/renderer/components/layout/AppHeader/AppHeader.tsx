@@ -1,12 +1,18 @@
 import React from 'react';
-import { Moon, Sun, History, Terminal } from 'lucide-react';
+import { Moon, Sun, History, Terminal, FileAudio, Mic } from 'lucide-react';
 import { Button } from '../../ui';
 import { useAppTheme, useAppHistory } from '../../../contexts';
 import { useDebugLogs } from '../../../hooks';
 import { DebugLogsModal } from '../../ui/DebugLogsModal';
 import appIcon from '../../../assets/icon.png';
+import type { AppMode } from '../../../App';
 
-function AppHeader(): React.JSX.Element {
+interface AppHeaderProps {
+  mode: AppMode;
+  onModeChange: (mode: AppMode) => void;
+}
+
+function AppHeader({ mode, onModeChange }: AppHeaderProps): React.JSX.Element {
   const { theme, toggleTheme } = useAppTheme();
   const { history, showHistory, toggleHistory } = useAppHistory();
   const {
@@ -29,6 +35,27 @@ function AppHeader(): React.JSX.Element {
               <h1>WhisperDesk</h1>
               <p>Transcribe audio &amp; video with AI</p>
             </div>
+
+            <div className="mode-toggle" role="tablist" aria-label="App mode">
+              <button
+                role="tab"
+                aria-selected={mode === 'file'}
+                className={`mode-toggle-btn${mode === 'file' ? ' mode-toggle-btn--active' : ''}`}
+                onClick={() => onModeChange('file')}
+              >
+                <FileAudio size={14} />
+                Files
+              </button>
+              <button
+                role="tab"
+                aria-selected={mode === 'live'}
+                className={`mode-toggle-btn${mode === 'live' ? ' mode-toggle-btn--active' : ''}`}
+                onClick={() => onModeChange('live')}
+              >
+                <Mic size={14} />
+                Live
+              </button>
+            </div>
           </div>
           <div className="header-actions">
             <Button
@@ -48,15 +75,17 @@ function AppHeader(): React.JSX.Element {
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
               className="theme-toggle"
             />
-            <Button
-              variant="icon"
-              icon={<History size={18} />}
-              onClick={toggleHistory}
-              title="Transcription History"
-              aria-label={`${showHistory ? 'Hide' : 'Show'} transcription history. ${history.length} items.`}
-            >
-              History ({history.length})
-            </Button>
+            {mode === 'file' && (
+              <Button
+                variant="icon"
+                icon={<History size={18} />}
+                onClick={toggleHistory}
+                title="Transcription History"
+                aria-label={`${showHistory ? 'Hide' : 'Show'} transcription history. ${history.length} items.`}
+              >
+                History ({history.length})
+              </Button>
+            )}
           </div>
         </div>
       </header>

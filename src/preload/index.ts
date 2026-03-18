@@ -5,6 +5,9 @@ import type {
   ModelDownloadProgress,
   TranscriptionProgress,
   UpdateStatus,
+  LiveCaptureOptions,
+  LiveTranscriptChunk,
+  LiveCaptureStatus,
 } from '../shared/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -65,6 +68,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:toggleHistory', () => callback());
     return () => ipcRenderer.removeAllListeners('menu:toggleHistory');
   },
+
+  // Live system audio capture
+  startLiveCapture: (options: LiveCaptureOptions) => ipcRenderer.invoke('live:start', options),
+  stopLiveCapture: () => ipcRenderer.invoke('live:stop'),
+  getLiveCaptureStatus: () => ipcRenderer.invoke('live:status') as Promise<LiveCaptureStatus>,
+  onLiveChunk: (callback: (chunk: LiveTranscriptChunk) => void) => {
+    ipcRenderer.on('live:chunk', (_event, chunk) => callback(chunk));
+    return () => ipcRenderer.removeAllListeners('live:chunk');
+  },
+  onLiveStatus: (callback: (status: LiveCaptureStatus) => void) => {
+    ipcRenderer.on('live:status', (_event, status) => callback(status));
+    return () => ipcRenderer.removeAllListeners('live:status');
+  },
+  onLiveError: (callback: (error: string) => void) => {
+    ipcRenderer.on('live:error', (_event, error) => callback(error));
+    return () => ipcRenderer.removeAllListeners('live:error');
+  },
+  onLiveTranslation: (callback: (data: { index: number; translation: string }) => void) => {
+    ipcRenderer.on('live:translation', (_event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('live:translation');
+  },
+  onLivePartial: (callback: (text: string) => void) => {
+    ipcRenderer.on('live:partial', (_event, text) => callback(text));
+    return () => ipcRenderer.removeAllListeners('live:partial');
+  },
+  onLivePartialTranslation: (callback: (translation: string) => void) => {
+    ipcRenderer.on('live:partial-translation', (_event, t) => callback(t));
+    return () => ipcRenderer.removeAllListeners('live:partial-translation');
+  },
+
+  // Translation backend
+  setTranslationBackend: (backend: 'xenova' | 'apple') =>
+    ipcRenderer.invoke('translation:setBackend', backend),
+  getTranslationBackend: () =>
+    ipcRenderer.invoke('translation:getBackend') as Promise<'xenova' | 'apple'>,
 
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),

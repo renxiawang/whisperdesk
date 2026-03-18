@@ -47,6 +47,17 @@ const mockElectronAPI: ElectronAPI = {
   downloadUpdate: vi.fn().mockResolvedValue({ success: true }),
   installUpdate: vi.fn(),
   onUpdateStatus: vi.fn().mockReturnValue(() => {}),
+  startLiveCapture: vi.fn().mockResolvedValue({ success: true }),
+  stopLiveCapture: vi.fn().mockResolvedValue({ success: true }),
+  getLiveCaptureStatus: vi.fn().mockResolvedValue({ status: 'idle' }),
+  onLiveChunk: vi.fn().mockReturnValue(() => {}),
+  onLiveStatus: vi.fn().mockReturnValue(() => {}),
+  onLiveError: vi.fn().mockReturnValue(() => {}),
+  onLiveTranslation: vi.fn().mockReturnValue(() => {}),
+  onLivePartial: vi.fn().mockReturnValue(() => {}),
+  onLivePartialTranslation: vi.fn().mockReturnValue(() => {}),
+  setTranslationBackend: vi.fn().mockResolvedValue({ success: true }),
+  getTranslationBackend: vi.fn().mockResolvedValue('xenova'),
 };
 
 Object.defineProperty(window, 'electronAPI', {

@@ -4,6 +4,7 @@ import path from 'path';
 import { registerIpcHandlers } from './ipc';
 import { initAnalytics, trackEvent, AnalyticsEvents } from './services/analytics';
 import { initAutoUpdater, checkForUpdates } from './services/auto-updater';
+import { stopTranslator, warmupTranslationWorker } from './services/translation';
 import { safeSend } from './utils/safe-send';
 import packageJson from '../../package.json';
 
@@ -252,6 +253,7 @@ const createWindow = () => {
 
 app.on('ready', () => {
   createWindow();
+  warmupTranslationWorker();
 
   if (!isDev) {
     initAutoUpdater(() => mainWindow);
@@ -260,6 +262,7 @@ app.on('ready', () => {
 
 app.on('before-quit', () => {
   trackEvent(AnalyticsEvents.APP_CLOSED);
+  stopTranslator();
 });
 
 app.on('window-all-closed', () => {
