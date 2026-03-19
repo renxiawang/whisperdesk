@@ -58,6 +58,7 @@ export const createMockModels = (
 export const MOCK_SETTINGS: TranscriptionSettings = {
   model: 'base',
   language: 'en',
+  remoteTranscriptionUrl: 'http://192.168.2.100:11435/v1/audio/transcriptions',
 };
 
 export const MOCK_GPU_INFO: GpuInfo = {

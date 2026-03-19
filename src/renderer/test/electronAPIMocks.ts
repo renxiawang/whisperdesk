@@ -55,7 +55,7 @@ export const createDefaultElectronAPIMock = (): ElectronAPI => ({
   onLivePartial: vi.fn().mockReturnValue(() => {}),
   onLivePartialTranslation: vi.fn().mockReturnValue(() => {}),
   setTranslationBackend: vi.fn().mockResolvedValue({ success: true }),
-  getTranslationBackend: vi.fn().mockResolvedValue('xenova'),
+  getTranslationBackend: vi.fn().mockResolvedValue('apple'),
 });
 export const createFullElectronAPIMock = (): ElectronAPI => ({
   openFile: vi.fn().mockResolvedValue('/path/file.mp3'),
@@ -99,7 +99,7 @@ export const createFullElectronAPIMock = (): ElectronAPI => ({
   onLivePartial: vi.fn().mockReturnValue(() => {}),
   onLivePartialTranslation: vi.fn().mockReturnValue(() => {}),
   setTranslationBackend: vi.fn().mockResolvedValue({ success: true }),
-  getTranslationBackend: vi.fn().mockResolvedValue('xenova'),
+  getTranslationBackend: vi.fn().mockResolvedValue('apple'),
 });
 
 export class ElectronAPIMockBuilder {

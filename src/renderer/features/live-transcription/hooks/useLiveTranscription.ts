@@ -27,7 +27,10 @@ export interface UseLiveTranscriptionReturn {
   error: string | null;
   elapsedSec: number;
   isActive: boolean;
-  start: (settings: TranscriptionSettings, engine?: 'whisper' | 'apple') => Promise<void>;
+  start: (
+    settings: TranscriptionSettings,
+    engine?: 'whisper' | 'apple' | 'remote'
+  ) => Promise<void>;
   stop: () => Promise<void>;
   clear: () => void;
 }
@@ -111,7 +114,7 @@ export function useLiveTranscription(): UseLiveTranscriptionReturn {
   const isActive = status === 'capturing' || status === 'transcribing' || status === 'stopping';
 
   const start = useCallback(
-    async (settings: TranscriptionSettings, engine: 'whisper' | 'apple' = 'whisper') => {
+    async (settings: TranscriptionSettings, engine: 'whisper' | 'apple' | 'remote' = 'whisper') => {
       setError(null);
       setChunks([]);
       setPartialText('');
@@ -121,6 +124,7 @@ export function useLiveTranscription(): UseLiveTranscriptionReturn {
       const options: LiveCaptureOptions = {
         model: settings.model,
         language: settings.language,
+        remoteTranscriptionUrl: settings.remoteTranscriptionUrl,
         transcriptionEngine: engine,
       };
 

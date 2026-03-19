@@ -27,6 +27,7 @@ describe('SettingsPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Select Whisper model')).toBeInTheDocument();
       expect(screen.getByLabelText('Select transcription language')).toBeInTheDocument();
+      expect(screen.getByLabelText('Remote transcription URL')).toBeInTheDocument();
     });
   });
 
@@ -87,6 +88,26 @@ describe('SettingsPanel', () => {
     expect(onChange).toHaveBeenCalledWith({
       ...mockSettings,
       language: 'es',
+    });
+  });
+
+  it('calls onChange when remote transcription URL is edited', async () => {
+    const onChange = vi.fn();
+    overrideElectronAPI({
+      listModels: vi.fn().mockResolvedValue({ models: mockModels }),
+      getGpuStatus: vi.fn().mockResolvedValue(mockGpuInfo),
+    });
+
+    render(<SettingsPanel settings={mockSettings} onChange={onChange} disabled={false} />);
+
+    const input = await screen.findByLabelText('Remote transcription URL');
+    fireEvent.change(input, {
+      target: { value: 'http://server.local:9000/v1/audio/transcriptions' },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...mockSettings,
+      remoteTranscriptionUrl: 'http://server.local:9000/v1/audio/transcriptions',
     });
   });
 
@@ -444,6 +465,7 @@ describe('SettingsPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Select Whisper model')).toBeDisabled();
       expect(screen.getByLabelText('Select transcription language')).toBeDisabled();
+      expect(screen.getByLabelText('Remote transcription URL')).toBeDisabled();
     });
   });
 

@@ -39,8 +39,10 @@ function LiveTranscriptionPanel({
   const { copySuccess, copyToClipboard } = useCopyToClipboard();
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  const [transcriptionEngine, setTranscriptionEngine] = useState<'whisper' | 'apple'>('whisper');
-  const [translationBackend, setTranslationBackendState] = useState<'xenova' | 'apple'>('xenova');
+  const [transcriptionEngine, setTranscriptionEngine] = useState<'whisper' | 'apple' | 'remote'>(
+    'remote'
+  );
+  const [translationBackend, setTranslationBackendState] = useState<'xenova' | 'apple'>('apple');
 
   // Sync initial backend value from main process
   useEffect(() => {
@@ -72,7 +74,8 @@ function LiveTranscriptionPanel({
     }
   };
 
-  const canStart = !isActive && modelDownloaded;
+  const requiresLocalModel = transcriptionEngine === 'whisper';
+  const canStart = !isActive && (!requiresLocalModel || modelDownloaded);
 
   return (
     <div className="live-transcription-panel">
@@ -86,7 +89,13 @@ function LiveTranscriptionPanel({
               onClick={handleStart}
               disabled={!canStart}
               aria-label="Start live capture"
-              title={!modelDownloaded ? 'Download a model first' : 'Start capturing system audio'}
+              title={
+                !canStart
+                  ? 'Download a model first'
+                  : transcriptionEngine === 'remote'
+                    ? 'Start capturing system audio and transcribe via local API'
+                    : 'Start capturing system audio'
+              }
             >
               Start Capture
             </Button>
@@ -121,6 +130,14 @@ function LiveTranscriptionPanel({
               title="Apple Speech (streaming, low latency, macOS 13+)"
             >
               Apple
+            </button>
+            <button
+              className={`live-backend-btn${transcriptionEngine === 'remote' ? ' live-backend-btn--active' : ''}`}
+              onClick={() => setTranscriptionEngine('remote')}
+              disabled={isActive}
+              title="Remote API (chunked upload to local transcription server)"
+            >
+              API
             </button>
           </div>
 
@@ -209,7 +226,11 @@ function LiveTranscriptionPanel({
         {chunks.length === 0 && isActive && (
           <div className="live-placeholder">
             <span className="live-dot live-dot-lg" />
-            <p>Listening... transcript will appear after the first chunk is processed.</p>
+            <p>
+              {transcriptionEngine === 'apple'
+                ? 'Listening... partial transcript should appear almost immediately.'
+                : 'Listening... transcript will appear after the first chunk is processed.'}
+            </p>
           </div>
         )}
 

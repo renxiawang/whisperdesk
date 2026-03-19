@@ -37,7 +37,11 @@ export type OutputFormat = 'vtt' | 'srt' | 'txt' | 'json' | 'docx' | 'pdf' | 'md
 export interface TranscriptionSettings {
   model: WhisperModelName;
   language: LanguageCode;
+  remoteTranscriptionUrl: string;
 }
+
+export const DEFAULT_REMOTE_TRANSCRIPTION_URL =
+  'http://192.168.2.100:11435/v1/audio/transcriptions';
 
 export type QualityLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -235,6 +239,7 @@ export interface UpdateStatus {
 export interface LiveCaptureOptions {
   model: WhisperModelName;
   language: LanguageCode;
+  remoteTranscriptionUrl?: string;
   /** Duration of each audio chunk in seconds (default 10). */
   chunkDurationSeconds?: number;
   /** Seconds of overlap between consecutive chunks to avoid cutting words (default 2). */
@@ -243,8 +248,9 @@ export interface LiveCaptureOptions {
    * Transcription engine to use.
    * - 'whisper' (default) — whisper.cpp CLI, high accuracy, chunked.
    * - 'apple'             — macOS SFSpeechRecognizer, streaming, low latency.
+   * - 'remote'            — chunked upload to a local HTTP transcription API.
    */
-  transcriptionEngine?: 'whisper' | 'apple';
+  transcriptionEngine?: 'whisper' | 'apple' | 'remote';
 }
 
 export interface LiveTranscriptChunk {

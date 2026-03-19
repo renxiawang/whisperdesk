@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ChangeEvent } from 'react';
 import './SettingsPanel.css';
 
 import type {
@@ -108,6 +108,10 @@ function SettingsPanel({
     onChange({ ...settings, language });
   };
 
+  const handleRemoteUrlChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    onChange({ ...settings, remoteTranscriptionUrl: event.target.value });
+  };
+
   const handleDownloadModel = async (modelName: string): Promise<void> => {
     try {
       setDownloading(modelName);
@@ -173,6 +177,26 @@ function SettingsPanel({
         disabled={disabled}
         onChange={handleLanguageChange}
       />
+
+      <div className="settings-field">
+        <label className="settings-field__label" htmlFor="remote-transcription-url">
+          Remote transcription URL
+        </label>
+        <input
+          id="remote-transcription-url"
+          className="settings-field__input"
+          type="url"
+          value={settings.remoteTranscriptionUrl}
+          onChange={handleRemoteUrlChange}
+          disabled={disabled}
+          spellCheck={false}
+          placeholder="http://host:port/v1/audio/transcriptions"
+          aria-describedby="remote-transcription-url-hint"
+        />
+        <p id="remote-transcription-url-hint" className="settings-field__hint">
+          Used by the live `API` engine for chunked transcription requests.
+        </p>
+      </div>
     </div>
   );
 }

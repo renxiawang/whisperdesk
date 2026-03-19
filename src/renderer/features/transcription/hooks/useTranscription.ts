@@ -1,8 +1,14 @@
 import { useState, useCallback } from 'react';
-import type { SelectedFile, TranscriptionSettings, OutputFormat } from '../../../types';
+import {
+  DEFAULT_REMOTE_TRANSCRIPTION_URL,
+  type SelectedFile,
+  type TranscriptionSettings,
+  type OutputFormat,
+} from '../../../types';
 import { saveFile, showItemInFolder } from '../../../services/electronAPI';
 import { logger } from '../../../services/logger';
 import { sanitizePath } from '../../../../shared/utils';
+import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../../../utils/storage';
 
 function shouldRevealInFinderAfterSave(): boolean {
   if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
@@ -46,13 +52,26 @@ export interface UseTranscriptionReturn {
 
 export function useTranscription(): UseTranscriptionReturn {
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-  const [settings, setSettings] = useState<TranscriptionSettings>({
-    model: 'base',
-    language: 'auto',
+  const [settings, setSettingsState] = useState<TranscriptionSettings>(() => {
+    const defaults: TranscriptionSettings = {
+      model: 'base',
+      language: 'auto',
+      remoteTranscriptionUrl: DEFAULT_REMOTE_TRANSCRIPTION_URL,
+    };
+
+    return {
+      ...defaults,
+      ...getStorageItem<Partial<TranscriptionSettings>>(STORAGE_KEYS.SETTINGS, defaults),
+    };
   });
   const [transcription, setTranscription] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [modelDownloaded, setModelDownloaded] = useState<boolean>(true);
+
+  const setSettings = useCallback((nextSettings: TranscriptionSettings): void => {
+    setSettingsState(nextSettings);
+    setStorageItem(STORAGE_KEYS.SETTINGS, nextSettings);
+  }, []);
 
   const handleSave = useCallback(
     async (format: OutputFormat = 'vtt'): Promise<void> => {

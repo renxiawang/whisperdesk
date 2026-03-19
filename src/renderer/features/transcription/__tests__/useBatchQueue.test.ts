@@ -17,6 +17,7 @@ describe('useBatchQueue', () => {
   const mockSettings: TranscriptionSettings = {
     model: 'base',
     language: 'en',
+    remoteTranscriptionUrl: 'http://192.168.2.100:11435/v1/audio/transcriptions',
   };
 
   const mockOnHistoryAdd = vi.fn();

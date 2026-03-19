@@ -4,10 +4,12 @@ import { useTranscription } from '@/features/transcription';
 import { overrideElectronAPI } from '@/test/utils';
 import { createMockFile } from '@/test/fixtures';
 import { logger } from '@/services/logger';
+import { DEFAULT_REMOTE_TRANSCRIPTION_URL } from '@/types';
 
 describe('useTranscription', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   const mockFile = createMockFile();
@@ -26,6 +28,7 @@ describe('useTranscription', () => {
 
     expect(result.current.settings.model).toBe('base');
     expect(result.current.settings.language).toBe('auto');
+    expect(result.current.settings.remoteTranscriptionUrl).toBe(DEFAULT_REMOTE_TRANSCRIPTION_URL);
   });
 
   it('should set selected file', () => {
@@ -45,11 +48,34 @@ describe('useTranscription', () => {
       result.current.setSettings({
         model: 'small',
         language: 'pt',
+        remoteTranscriptionUrl: 'http://example.test/v1/audio/transcriptions',
       });
     });
 
     expect(result.current.settings.model).toBe('small');
     expect(result.current.settings.language).toBe('pt');
+    expect(result.current.settings.remoteTranscriptionUrl).toBe(
+      'http://example.test/v1/audio/transcriptions'
+    );
+  });
+
+  it('should restore settings from localStorage', () => {
+    localStorage.setItem(
+      'whisperdesk_settings',
+      JSON.stringify({
+        model: 'small',
+        language: 'es',
+        remoteTranscriptionUrl: 'http://restored.test/v1/audio/transcriptions',
+      })
+    );
+
+    const { result } = renderHook(() => useTranscription());
+
+    expect(result.current.settings).toEqual({
+      model: 'small',
+      language: 'es',
+      remoteTranscriptionUrl: 'http://restored.test/v1/audio/transcriptions',
+    });
   });
 
   it('should update error state', () => {

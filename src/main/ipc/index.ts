@@ -260,11 +260,11 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   // -----------------------------------------------------------------------
 
   // Track which engine started the current session so stop() uses the right one
-  let activeTranscriptionEngine: 'whisper' | 'apple' = 'whisper';
+  let activeTranscriptionEngine: 'whisper' | 'apple' | 'remote' = 'whisper';
 
   // Whisper engine events
   onLiveCaptureEvent((event) => {
-    if (activeTranscriptionEngine !== 'whisper') return;
+    if (activeTranscriptionEngine !== 'whisper' && activeTranscriptionEngine !== 'remote') return;
     const win = getMainWindow();
     if (!win) return;
 
@@ -302,7 +302,12 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('live:start', async (_event, options: LiveCaptureOptions) => {
     try {
-      activeTranscriptionEngine = options.transcriptionEngine === 'apple' ? 'apple' : 'whisper';
+      activeTranscriptionEngine =
+        options.transcriptionEngine === 'apple'
+          ? 'apple'
+          : options.transcriptionEngine === 'remote'
+            ? 'remote'
+            : 'whisper';
       if (activeTranscriptionEngine === 'apple') {
         await startAppleLiveCapture(options);
       } else {

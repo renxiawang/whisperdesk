@@ -23,6 +23,7 @@ import type {
   WhisperModelName,
   LanguageCode,
 } from '../../shared/types';
+import { DEFAULT_REMOTE_TRANSCRIPTION_URL } from '../../shared/types';
 import { createWavBuffer } from '../utils/wav-writer';
 import { getWhisperBinaryPath, getModelPath, MODELS } from './whisper';
 import { translateText } from './translation';
@@ -38,7 +39,6 @@ const BYTES_PER_SECOND = SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE;
 const DEFAULT_CHUNK_DURATION = 10; // maximum seconds before forced flush
 const DEFAULT_OVERLAP = 2; // seconds of overlap on max-duration cuts
 const MODEL_ALIASES: Record<string, string> = { large: 'large-v3', turbo: 'large-v3-turbo' };
-
 // Silence / pause detection — lets us cut chunks at natural speech pauses
 // rather than always waiting for the full max duration.
 const SILENCE_RMS_THRESHOLD = 300; // int16 RMS below this = silence
@@ -128,6 +128,7 @@ function getAudioCaptureBinaryPath(): string {
 // whisper-cli can hang indefinitely on silent/blank audio; this is the max
 // we'll wait before killing it.  Generous enough for slow machines + large models.
 const WHISPER_TIMEOUT_MS = 60_000;
+const REMOTE_TRANSCRIPTION_TIMEOUT_MS = 120_000;
 
 // Tokens whisper-cli emits instead of real text — treat as empty.
 const BLANK_AUDIO_RE = /^\s*(\[BLANK_AUDIO\]\s*)+$/;
@@ -213,6 +214,47 @@ function transcribeWavChunk(
   });
 }
 
+async function transcribeWavChunkRemote(
+  wavPath: string,
+  language: LanguageCode,
+  endpoint: string
+): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REMOTE_TRANSCRIPTION_TIMEOUT_MS);
+
+  try {
+    const wavData = await fs.promises.readFile(wavPath);
+    const form = new FormData();
+    form.append('file', new Blob([wavData], { type: 'audio/wav' }), path.basename(wavPath));
+    form.append('response_format', 'text');
+
+    if (language !== 'auto') {
+      form.append('language', language);
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      body: form,
+      signal: controller.signal,
+    });
+
+    const body = await response.text();
+    if (!response.ok) {
+      const detail = body.trim() || `HTTP ${response.status}`;
+      throw new Error(`Remote API request failed: ${detail}`);
+    }
+
+    return body.trim();
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Remote API request timed out after 120 s');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Start / Stop
 // ---------------------------------------------------------------------------
@@ -227,19 +269,24 @@ export async function startLiveCapture(options: LiveCaptureOptions): Promise<voi
     throw new Error('audio-capture binary not found. Run: npm run build:audio-capture');
   }
 
-  // Validate model
-  const actualModel = MODEL_ALIASES[options.model] || options.model || 'base';
-  if (!MODELS[actualModel]) {
-    throw new Error(`Unknown model: ${options.model}`);
-  }
-  let modelPath: string;
-  try {
-    modelPath = getModelPath(actualModel);
-  } catch (err) {
-    throw new Error(`Invalid model: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!fs.existsSync(modelPath)) {
-    throw new Error(`Model '${actualModel}' not downloaded. Download it first.`);
+  const transcriptionEngine = options.transcriptionEngine === 'remote' ? 'remote' : 'whisper';
+  const remoteTranscriptionUrl =
+    options.remoteTranscriptionUrl?.trim() || DEFAULT_REMOTE_TRANSCRIPTION_URL;
+
+  if (transcriptionEngine === 'whisper') {
+    const actualModel = MODEL_ALIASES[options.model] || options.model || 'base';
+    if (!MODELS[actualModel]) {
+      throw new Error(`Unknown model: ${options.model}`);
+    }
+    let modelPath: string;
+    try {
+      modelPath = getModelPath(actualModel);
+    } catch (err) {
+      throw new Error(`Invalid model: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (!fs.existsSync(modelPath)) {
+      throw new Error(`Model '${actualModel}' not downloaded. Download it first.`);
+    }
   }
 
   const chunkDuration = options.chunkDurationSeconds ?? DEFAULT_CHUNK_DURATION;
@@ -404,7 +451,10 @@ export async function startLiveCapture(options: LiveCaptureOptions): Promise<voi
       const wavData = createWavBuffer(chunkPcm);
       fs.writeFileSync(wavPath, wavData);
 
-      const text = await transcribeWavChunk(wavPath, options.model, options.language);
+      const text =
+        transcriptionEngine === 'remote'
+          ? await transcribeWavChunkRemote(wavPath, options.language, remoteTranscriptionUrl)
+          : await transcribeWavChunk(wavPath, options.model, options.language);
 
       if (text && !stopRequested) {
         emit({

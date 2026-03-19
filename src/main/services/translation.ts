@@ -3,10 +3,10 @@
  *
  * Two backends are supported and can be switched at runtime:
  *
- *   'xenova' (default) — ONNX/WASM via a Worker Thread; offline; ~80 MB models
+ *   'xenova'           — ONNX/WASM via a Worker Thread; offline; ~80 MB models
  *                        downloaded on first use to userData/hf-models/.
  *
- *   'apple'            — macOS 26+ Translation framework via the `apple-translator`
+ *   'apple' (default) — macOS 26+ Translation framework via the `apple-translator`
  *                        Swift subprocess; on-device; no model download needed.
  *                        Build first:  npm run build:translator
  *
@@ -98,7 +98,7 @@ function getWorker(): Worker {
 
 export type TranslationBackend = 'xenova' | 'apple';
 
-let activeBackend: TranslationBackend = 'xenova';
+let activeBackend: TranslationBackend = 'apple';
 
 export function setTranslationBackend(backend: TranslationBackend): void {
   activeBackend = backend;

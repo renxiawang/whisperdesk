@@ -57,7 +57,7 @@ const mockElectronAPI: ElectronAPI = {
   onLivePartial: vi.fn().mockReturnValue(() => {}),
   onLivePartialTranslation: vi.fn().mockReturnValue(() => {}),
   setTranslationBackend: vi.fn().mockResolvedValue({ success: true }),
-  getTranslationBackend: vi.fn().mockResolvedValue('xenova'),
+  getTranslationBackend: vi.fn().mockResolvedValue('apple'),
 };
 
 Object.defineProperty(window, 'electronAPI', {
