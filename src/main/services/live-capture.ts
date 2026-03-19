@@ -46,6 +46,7 @@ const SILENCE_TRIGGER_SECS = 0.4; // 400 ms of silence → flush early
 const SILENCE_MIN_DURATION_SECS = 3; // don't flush before 3 s of audio
 const SILENCE_OVERLAP_SECS = 0.3; // small tail to keep after silence cut
 const SILENCE_WINDOW_SECS = 0.05; // analyse RMS in 50 ms windows
+const MIN_SPEECH_CHUNK_SECS = 0.15; // skip API calls for near-silent / noise-only chunks
 
 /** Compute RMS of a slice of int16 LE PCM data. */
 function computeRMS(buf: Buffer, startByte: number, byteCount: number): number {
@@ -58,6 +59,25 @@ function computeRMS(buf: Buffer, startByte: number, byteCount: number): number {
     sumSq += s * s;
   }
   return Math.sqrt(sumSq / (count / 2));
+}
+
+function analyzeChunkAudio(
+  buf: Buffer,
+  windowBytes: number
+): { speechBytes: number; maxRms: number } {
+  let speechBytes = 0;
+  let maxRms = 0;
+
+  for (let i = 0; i < buf.length; i += windowBytes) {
+    const windowSize = Math.min(windowBytes, buf.length - i);
+    const rms = computeRMS(buf, i, windowSize);
+    maxRms = Math.max(maxRms, rms);
+    if (rms > SILENCE_RMS_THRESHOLD) {
+      speechBytes += windowSize;
+    }
+  }
+
+  return { speechBytes, maxRms };
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +431,14 @@ export async function startLiveCapture(options: LiveCaptureOptions): Promise<voi
 
     if (!maxDurationReached && !silencePauseDetected) return;
 
+    // If we've accumulated only silence/noise since the last flush, drop it
+    // instead of repeatedly sending tiny silent chunks to the transcription backend.
+    if (silencePauseDetected && lastSpeechByte === 0) {
+      pcmBuffer = Buffer.alloc(0);
+      silentBytesAtEnd = 0;
+      return;
+    }
+
     processingChunk = true;
     status = 'transcribing';
     emit({ type: 'status', status: 'transcribing' });
@@ -448,6 +476,14 @@ export async function startLiveCapture(options: LiveCaptureOptions): Promise<voi
     const wavPath = path.join(app.getPath('temp'), `whisperdesk_live_${crypto.randomUUID()}.wav`);
 
     try {
+      const { speechBytes, maxRms } = analyzeChunkAudio(chunkPcm, silenceWindowBytes);
+      const hasEnoughSpeech =
+        speechBytes >= MIN_SPEECH_CHUNK_SECS * BYTES_PER_SECOND && maxRms > SILENCE_RMS_THRESHOLD;
+
+      if (!hasEnoughSpeech) {
+        return;
+      }
+
       const wavData = createWavBuffer(chunkPcm);
       fs.writeFileSync(wavPath, wavData);
 
